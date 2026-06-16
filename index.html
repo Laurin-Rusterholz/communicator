@@ -160,6 +160,49 @@
     .back-btn{display:inline-flex !important}
   }
   .back-btn{display:none;margin-right:4px}
+
+  /* ---- Topbar-Aktionen: Verfügbarkeit + Einstellungen ---- */
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .topbar-right .conn{margin-left:0}
+  .avail-pill{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:20px;
+    border:1px solid var(--border);background:var(--panel2);color:var(--text);font-weight:700;font-size:12.5px}
+  .avail-pill .ad{width:9px;height:9px;border-radius:50%;background:var(--muted2)}
+  .avail-pill.verfuegbar{border-color:rgba(16,185,129,.45);color:#34d399}
+  .avail-pill.verfuegbar .ad{background:var(--green)}
+  .avail-pill.beschaeftigt{border-color:rgba(245,158,11,.5);color:#fbbf24}
+  .avail-pill.beschaeftigt .ad{background:var(--amber)}
+  .avail-pill small{font-weight:500;opacity:.8}
+  .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+    color:var(--text);font-size:16px;display:grid;place-items:center}
+  .icon-btn:hover{background:#2a3645}
+
+  /* ---- Einstellungen-Modal ---- */
+  .modal.wide{width:min(560px,94vw);max-height:90vh;display:flex;flex-direction:column}
+  .modal.wide .modal-body{overflow-y:auto}
+  .set-section{border:1px solid var(--border);border-radius:12px;padding:14px 15px;background:var(--bg)}
+  .set-section h4{margin:0 0 10px;font-size:13.5px;display:flex;align-items:center;gap:8px}
+  .set-note{font-size:11.5px;color:var(--muted2);margin-top:7px;line-height:1.5}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+  .seg button{padding:8px 16px;background:var(--bg);color:var(--muted);border:0;font-weight:700;font-size:13px}
+  .seg button.on.v{background:var(--green);color:#06281d}
+  .seg button.on.b{background:var(--amber);color:#3a2706}
+  .preview{margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--panel2);border:1px dashed var(--border);
+    font-size:12.5px;color:var(--muted);white-space:pre-wrap}
+  .key-row{display:flex;gap:8px;align-items:center}
+  .key-row input{flex:1}
+  .key-state{font-size:11.5px;font-weight:700}
+  .key-state.ok{color:#34d399}
+  .key-state.no{color:var(--muted2)}
+
+  /* ---- Zusammenfassen ---- */
+  .summarize-bar{margin-top:12px}
+  .btn.ai{background:rgba(139,92,246,.14);border-color:rgba(139,92,246,.4);color:#b794ff}
+  .btn.ai:hover:not(:disabled){background:rgba(139,92,246,.22)}
+  .badge.grp{background:rgba(59,130,246,.16);color:#7eacff}
+  .summary-out{white-space:pre-wrap;font-size:14px;line-height:1.6}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);
+    border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:-2px}
+  @keyframes rot{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -190,6 +233,9 @@ const CONFIG = {
   //  - ist audioId bereits eine URL -> wird direkt genutzt
   //  - sonst wird dieser Storage-Pfad verwendet ({audioId} wird ersetzt)
   audioPathTemplate: "communicator_audio/{audioId}",
+  settingsPath:     "settings",                 // /settings/... (von n8n gelesen)
+  summaryModel:     "gpt-4o-mini",              // OpenAI-Modell fuer die Zusammenfassung
+  openaiKeyStorage: "communicator_openai_key",  // localStorage-Key (NIE in RTDB / Code!)
   locale: "de-CH"
 };
 
@@ -230,7 +276,8 @@ const state = {
   selectedId: null,
   filter: "offen",       // offen | sprachmemo | beantwortet | alle
   search: "",
-  audioCache: {}         // id -> resolved url
+  audioCache: {},        // id -> resolved url
+  settings: null         // /settings aus RTDB (availability, awayMessage, ...)
 };
 
 let db = null, storage = null, app = null;
@@ -253,6 +300,7 @@ function boot(){
   renderShell();
   watchConnection();
   watchInbox();
+  watchSettings();
 }
 
 // ---- Live-Listener: Posteingang ------------------------------------------
@@ -326,9 +374,14 @@ function renderShell(){
       h("span", {class:"logo"}, "💬"),
       h("div", {}, h("div",{},"Communicator Pro"), h("small",{},"WhatsApp-Posteingang"))
     ),
-    h("div", {class:"conn"},
-      h("span", {id:"connDot", class:"dot"}),
-      h("span", {id:"connTxt"}, "Verbinde…")
+    h("div", {class:"topbar-right"},
+      h("button", {class:"avail-pill", id:"availPill", title:"Verfügbarkeit umschalten",
+        onclick:toggleAvailability}, "…"),
+      h("button", {class:"icon-btn", id:"gearBtn", title:"Einstellungen", onclick:openSettings}, "⚙️"),
+      h("div", {class:"conn"},
+        h("span", {id:"connDot", class:"dot"}),
+        h("span", {id:"connTxt"}, "Verbinde…")
+      )
     )
   );
 
@@ -344,11 +397,12 @@ function renderShell(){
   const reader = h("section", {class:"reader", id:"reader"});
 
   root.append(topbar, h("div",{class:"main"}, inbox, reader));
-  root.append(buildModal(), h("div",{class:"toast", id:"toast"}));
+  root.append(buildModal(), buildSettingsModal(), buildSummaryModal(), h("div",{class:"toast", id:"toast"}));
 
   renderTabs();
   renderList();
   renderReader();
+  renderAvailabilityPill();
 }
 
 function renderTabs(){
@@ -381,13 +435,14 @@ function renderList(){
     const open = isOpen(m);
     const badges = h("div",{class:"msg-badges"});
     badges.append(h("span",{class:"badge "+(m.status||"")}, statusInfo(m.status).icon+" "+statusInfo(m.status).label));
+    if (isGroupMsg(m)) badges.append(h("span",{class:"badge grp"}, "👥 Gruppe"));
     if (m.quantusTaskCreatedAt) badges.append(h("span",{class:"badge task"}, "✓ Quantus"));
 
     const item = h("div",{class:"msg"+(m.id===state.selectedId?" sel":"")+(open?" unread":""),
         onclick:()=>{ state.selectedId = m.id; state.audioCache={}; renderList(); renderReader();
                       const ib=$("#inbox"); if(ib) ib.classList.add("hide"); }},
       h("div",{class:"msg-top"},
-        h("span",{class:"msg-name"}, (isSprachmemo(m)?"🎤 ":"")+ (esc(m.name) || esc(m.from) || "Unbekannt")),
+        h("span",{class:"msg-name"}, (isGroupMsg(m)?"👥 ":"")+(isSprachmemo(m)?"🎤 ":"")+ (esc(displayName(m)) || "Unbekannt")),
         h("span",{class:"msg-time"}, fmtTime(m.timestamp))
       ),
       h("div",{class:"msg-prev"}, esc(m.text) || (isSprachmemo(m) ? "[Sprachnachricht]" : "—")),
@@ -412,17 +467,21 @@ function renderReader(){
   }
 
   // Kopf
+  const grp = isGroupMsg(m);
+  const openFromSender = state.messages.filter(x => sameSender(x, m) && isOpen(x));
   const head = h("div",{class:"rd-head"},
     h("div",{class:"rd-name"},
       h("button",{class:"btn back-btn", onclick:()=>{ const ib=$("#inbox"); if(ib) ib.classList.remove("hide"); }}, "‹"),
-      esc(m.name) || esc(m.from) || "Unbekannt"
+      (grp?"👥 ":"")+(esc(displayName(m)) || "Unbekannt"),
+      grp ? h("span",{class:"badge grp"}, "Gruppe") : null
     ),
     h("div",{class:"rd-meta"},
       h("span",{}, "📱 "+(esc(m.from)||"—")),
       h("span",{}, "🕑 "+(fmtTime(m.timestamp)||"—")),
       h("span",{}, statusInfo(m.status).icon+" "+statusInfo(m.status).label),
       m.type ? h("span",{}, "Typ: "+esc(m.type)) : null
-    )
+    ),
+    openFromSender.length >= 2 ? h("div",{class:"summarize-bar"}, buildSummarizeBtn(m, openFromSender.length)) : null
   );
 
   // Body
@@ -651,6 +710,281 @@ function renderError(msg){
     h("h1",{}, "⚠️ Fehler"),
     h("p",{}, msg)
   ));
+}
+
+// ===========================================================================
+//  Gruppen-Erkennung & Anzeigename
+// ===========================================================================
+function isGroupMsg(m){
+  return m.isGroup === true || m.type === "group" || m.chatType === "group"
+      || !!m.groupId || !!m.groupName || /@g\.us$/.test(String(m.from||""));
+}
+function displayName(m){
+  if (isGroupMsg(m)) return m.groupName || m.name || m.from || "Gruppe";
+  return m.name || m.from || "";
+}
+function sameSender(a, b){
+  if (isGroupMsg(a) || isGroupMsg(b)){
+    const ga = a.groupId || a.groupName || a.from, gb = b.groupId || b.groupName || b.from;
+    return !!ga && ga === gb;
+  }
+  return (a.from||"") === (b.from||"") && !!a.from;
+}
+
+// ===========================================================================
+//  Einstellungen (RTDB /settings)  +  Verfügbarkeits-Status
+// ===========================================================================
+function watchSettings(){
+  db.ref(CONFIG.settingsPath).on("value", (snap) => {
+    state.settings = snap.val() || {};
+    renderAvailabilityPill();
+    if ($("#settingsModal") && $("#settingsModal").classList.contains("show")) fillSettingsForm();
+  }, (err) => console.warn("settings read:", err.message));
+}
+function availability(){
+  const a = (state.settings && state.settings.availability) || {};
+  return { mode: a.mode === "beschaeftigt" ? "beschaeftigt" : "verfuegbar", busyUntil: a.busyUntil || null };
+}
+function renderAvailabilityPill(){
+  const pill = $("#availPill"); if (!pill) return;
+  const a = availability();
+  const busy = a.mode === "beschaeftigt";
+  pill.className = "avail-pill " + a.mode;
+  pill.innerHTML = "";
+  pill.append(h("span",{class:"ad"}));
+  pill.append(h("span",{}, busy ? "Beschäftigt" : "Verfügbar"));
+  if (busy && a.busyUntil) pill.append(h("small",{}, "bis "+fmtDateTime(a.busyUntil)));
+}
+async function toggleAvailability(){
+  const a = availability();
+  const next = a.mode === "verfuegbar" ? "beschaeftigt" : "verfuegbar";
+  await writeAvailability(next, next === "beschaeftigt" ? a.busyUntil : null);
+  toast(next === "beschaeftigt"
+    ? "Status: beschäftigt — n8n sendet Auto-Antworten."
+    : "Status: verfügbar — keine Auto-Antworten.", "ok");
+}
+async function writeAvailability(mode, busyUntil){
+  try{
+    await db.ref(CONFIG.settingsPath + "/availability").set({
+      mode, busyUntil: busyUntil || null, updatedAt: new Date().toISOString()
+    });
+  }catch(e){ toast("Speichern fehlgeschlagen: "+e.message, "err", 5000); }
+}
+
+// ---- Settings-Modal -------------------------------------------------------
+function openSettings(){ $("#settingsModal").classList.add("show"); fillSettingsForm(); }
+function closeSettings(){ $("#settingsModal").classList.remove("show"); }
+
+let _segMode = "verfuegbar";
+function setSeg(mode){
+  _segMode = mode === "beschaeftigt" ? "beschaeftigt" : "verfuegbar";
+  const v = $("#segV"), b = $("#segB"); if(!v||!b) return;
+  v.className = "v" + (_segMode==="verfuegbar"?" on":"");
+  b.className = "b" + (_segMode==="beschaeftigt"?" on":"");
+}
+function fillSettingsForm(){
+  const s = state.settings || {};
+  const a = availability();
+  setSeg(a.mode);
+  $("#sBusyUntil").value  = isoToLocalInput(a.busyUntil);
+  $("#sAway").value       = s.awayMessage || "";
+  $("#sNextReply").value  = isoToLocalInput(s.nextReplyAt);
+  $("#sGroup").value      = s.groupAwayMessage || "";
+  refreshAwayPreview();
+  const key = getOpenAIKey();
+  $("#sKey").value = key || "";
+  setKeyState(!!key);
+}
+function refreshAwayPreview(){
+  const away = ($("#sAway") && $("#sAway").value || "").trim();
+  const nextIso = ($("#sNextReply") && $("#sNextReply").value) ? localInputToIso($("#sNextReply").value) : null;
+  const next = nextIso ? fmtDateTime(nextIso) : "—";
+  const fb = away || ("Vielen Dank für deine Nachricht! Ich bin gerade nicht erreichbar und melde mich wieder am " + next + ".");
+  if ($("#awayPreview")) $("#awayPreview").textContent = "Vorschau Auto-Antwort:\n" + fb;
+  const g = ($("#sGroup") && $("#sGroup").value || "").trim();
+  if ($("#groupPreview")) $("#groupPreview").textContent = "Vorschau Gruppe:\n" + (g ? g.replace(/\{nextReplyAt\}/g, next) : "—");
+}
+async function saveSettings(){
+  const btn = $("#sSave"); if(btn){ btn.disabled=true; btn.textContent="Speichere…"; }
+  try{
+    const busyUntil = _segMode === "beschaeftigt" ? localInputToIso($("#sBusyUntil").value) : null;
+    await db.ref(CONFIG.settingsPath).update({
+      availability:     { mode: _segMode, busyUntil: busyUntil, updatedAt: new Date().toISOString() },
+      awayMessage:      ($("#sAway").value||"").trim(),
+      nextReplyAt:      localInputToIso($("#sNextReply").value),
+      groupAwayMessage: ($("#sGroup").value||"").trim()
+    });
+    toast("Einstellungen gespeichert.", "ok");
+    closeSettings();
+  }catch(e){ toast("Speichern fehlgeschlagen: "+e.message, "err", 5000); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent="Speichern"; } }
+}
+function buildSettingsModal(){
+  const seg = h("div",{class:"seg"},
+    h("button",{id:"segV", class:"v", onclick:()=>setSeg("verfuegbar")}, "Verfügbar"),
+    h("button",{id:"segB", class:"b", onclick:()=>setSeg("beschaeftigt")}, "Beschäftigt")
+  );
+  return h("div",{class:"modal-bg", id:"settingsModal", onclick:(e)=>{ if(e.target.id==="settingsModal") closeSettings(); }},
+    h("div",{class:"modal wide"},
+      h("h3",{}, "⚙️ Einstellungen"),
+      h("div",{class:"modal-body"},
+        h("div",{class:"set-section"},
+          h("h4",{}, "🟢 Verfügbarkeit"),
+          seg,
+          h("div",{class:"field", style:"margin-top:11px"},
+            h("label",{}, "Beschäftigt bis (optional — leer = bis manuell geändert)"),
+            h("input",{id:"sBusyUntil", type:"datetime-local"})
+          ),
+          h("div",{class:"set-note"}, "Nur im Status „Beschäftigt“ sendet n8n automatische Antworten. „Verfügbar“ = keine Auto-Antworten.")
+        ),
+        h("div",{class:"set-section"},
+          h("h4",{}, "✉️ Abwesenheitsmeldung"),
+          h("div",{class:"field"},
+            h("label",{}, "Eigener Text (leer = generischer Text mit Termin)"),
+            h("textarea",{id:"sAway", placeholder:"z.B. Danke für deine Nachricht! Ich bin gerade nicht erreichbar …", oninput:refreshAwayPreview})
+          ),
+          h("div",{class:"field", style:"margin-top:11px"},
+            h("label",{}, "Nächster Antworttermin"),
+            h("input",{id:"sNextReply", type:"datetime-local", oninput:refreshAwayPreview})
+          ),
+          h("div",{class:"preview", id:"awayPreview"})
+        ),
+        h("div",{class:"set-section"},
+          h("h4",{}, "👥 Gruppen-Antwort"),
+          h("div",{class:"field"},
+            h("label",{}, "Einmalige Gruppen-Auto-Antwort ", h("span",{class:"hint"}, "· Platzhalter {nextReplyAt}")),
+            h("textarea",{id:"sGroup", placeholder:"Hallo zusammen, ich antworte euch am {nextReplyAt}.", oninput:refreshAwayPreview})
+          ),
+          h("div",{class:"preview", id:"groupPreview"})
+        ),
+        h("div",{class:"set-section"},
+          h("h4",{}, "🧠 OpenAI-API-Key (nur lokal)"),
+          h("div",{class:"key-row"},
+            h("input",{id:"sKey", type:"password", placeholder:"sk-…", autocomplete:"off"}),
+            h("button",{class:"btn", onclick:saveKey}, "Speichern"),
+            h("button",{class:"btn", onclick:clearKey}, "Löschen")
+          ),
+          h("div",{style:"margin-top:8px"}, h("span",{id:"keyState", class:"key-state no"}, "Kein Key hinterlegt")),
+          h("div",{class:"set-note"}, "Wird ausschließlich in deinem Browser (localStorage) gespeichert — niemals im Code oder in der RTDB. Modell: "+CONFIG.summaryModel+".")
+        )
+      ),
+      h("div",{class:"modal-foot"},
+        h("button",{class:"btn", onclick:closeSettings}, "Schließen"),
+        h("button",{class:"btn primary", id:"sSave", onclick:saveSettings}, "Speichern")
+      )
+    )
+  );
+}
+
+// ---- OpenAI-Key (nur localStorage, nie in RTDB) ---------------------------
+function getOpenAIKey(){ try { return localStorage.getItem(CONFIG.openaiKeyStorage) || ""; } catch(e){ return ""; } }
+function setKeyState(has){
+  const el = $("#keyState"); if(!el) return;
+  el.className = "key-state " + (has?"ok":"no");
+  el.textContent = has ? "✓ Key hinterlegt (lokal)" : "Kein Key hinterlegt";
+}
+function saveKey(){
+  const v = ($("#sKey").value||"").trim();
+  try{
+    if (v) localStorage.setItem(CONFIG.openaiKeyStorage, v);
+    else localStorage.removeItem(CONFIG.openaiKeyStorage);
+  }catch(e){ toast("localStorage nicht verfügbar.", "err"); return; }
+  setKeyState(!!v);
+  toast(v ? "OpenAI-Key lokal gespeichert." : "OpenAI-Key entfernt.", "ok");
+  if (selected()) renderReader();
+}
+function clearKey(){
+  try{ localStorage.removeItem(CONFIG.openaiKeyStorage); }catch(e){}
+  if ($("#sKey")) $("#sKey").value = "";
+  setKeyState(false);
+  toast("OpenAI-Key entfernt.", "ok");
+  if (selected()) renderReader();
+}
+
+// ===========================================================================
+//  Zusammenfassung mehrerer Nachrichten (OpenAI gpt-4o-mini)
+// ===========================================================================
+function buildSummarizeBtn(m, count){
+  const hasKey = !!getOpenAIKey();
+  const btn = h("button",{class:"btn ai", onclick:()=>openSummary(m)},
+    "🧠 "+count+" Nachrichten zusammenfassen");
+  if (!hasKey){
+    btn.disabled = true;
+    btn.title = "OpenAI-Key in den Einstellungen (⚙️) hinterlegen";
+    btn.append(document.createTextNode("  ·  Key nötig"));
+  }
+  return btn;
+}
+function openSummary(m){
+  if (!getOpenAIKey()){ toast("Kein OpenAI-Key — bitte in den Einstellungen (⚙️) hinterlegen.", "err", 5000); return; }
+  const msgs = state.messages.filter(x => sameSender(x, m) && isOpen(x))
+    .sort((a,b)=>tsNum(a.timestamp)-tsNum(b.timestamp));
+  $("#summaryWho").textContent = displayName(m);
+  const out = $("#summaryOut"); out.innerHTML = "";
+  out.append(h("div",{class:"hint"}, h("span",{class:"spin"}), " Erstelle Zusammenfassung von "+msgs.length+" Nachrichten…"));
+  $("#summaryModal").classList.add("show");
+  runSummary(m, msgs);
+}
+function closeSummary(){ $("#summaryModal").classList.remove("show"); }
+async function runSummary(m, msgs){
+  const out = $("#summaryOut");
+  try{
+    const lines = msgs.map(x => "["+fmtDateTime(tsToIso(x.timestamp))+"] " +
+      (x.text || (isSprachmemo(x) ? "(Sprachnachricht)" : "(kein Text)"))).join("\n");
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+getOpenAIKey() },
+      body: JSON.stringify({
+        model: CONFIG.summaryModel,
+        temperature: 0.3,
+        max_tokens: 400,
+        messages:[
+          {role:"system", content:"Du fasst eingegangene WhatsApp-Nachrichten knapp auf Deutsch zusammen. Gib 2–5 kurze Stichpunkte mit den Kernaussagen und markiere offene Fragen oder To-dos klar."},
+          {role:"user", content:"Nachrichten von "+displayName(m)+":\n\n"+lines}
+        ]
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error((data && data.error && data.error.message) || ("HTTP "+resp.status));
+    const text = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || "").trim() || "(keine Antwort erhalten)";
+    out.innerHTML = "";
+    out.append(h("div",{class:"summary-out"}, text));
+  }catch(e){
+    out.innerHTML = "";
+    out.append(h("div",{class:"audio-err"}, "⚠️ "+e.message+" (Key/Netz/CORS prüfen)"));
+  }
+}
+function buildSummaryModal(){
+  return h("div",{class:"modal-bg", id:"summaryModal", onclick:(e)=>{ if(e.target.id==="summaryModal") closeSummary(); }},
+    h("div",{class:"modal wide"},
+      h("h3",{}, "🧠 Zusammenfassung — ", h("span",{id:"summaryWho"})),
+      h("div",{class:"modal-body"},
+        h("div",{class:"set-section"}, h("div",{id:"summaryOut"}))
+      ),
+      h("div",{class:"modal-foot"},
+        h("button",{class:"btn", onclick:()=>{ const t=($("#summaryOut").textContent||""); if(navigator.clipboard) navigator.clipboard.writeText(t); toast("Kopiert.", "ok"); }}, "Kopieren"),
+        h("button",{class:"btn primary", onclick:closeSummary}, "Schließen")
+      )
+    )
+  );
+}
+
+// ---- Datum/Zeit-Helfer ----------------------------------------------------
+function tsToIso(ts){ const n=tsNum(ts); return n ? new Date(n).toISOString() : null; }
+function fmtDateTime(iso){
+  if (!iso) return "—";
+  const d = new Date(iso); if (isNaN(d.getTime())) return String(iso);
+  return d.toLocaleString(CONFIG.locale, {day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit"});
+}
+function isoToLocalInput(iso){
+  if (!iso) return "";
+  const d = new Date(iso); if (isNaN(d.getTime())) return "";
+  const p = (n)=>String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());
+}
+function localInputToIso(v){
+  if (!v) return null;
+  const d = new Date(v); return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 // ---- Start ----------------------------------------------------------------
