@@ -1,0 +1,2 @@
+# Secrets nicht versionieren – nur die Vorlage .env.example gehört ins Repo.
+.env

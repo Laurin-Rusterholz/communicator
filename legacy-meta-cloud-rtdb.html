@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Communicator Pro</title>
+
+<!-- Firebase Web SDK (compat, gleiche Version wie Quantus/ai-sync) -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#0f1419; --bg2:#161c24; --panel:#1b232e; --panel2:#212b38;
+    --border:#2a3543; --text:#e7edf3; --muted:#8a98a8; --muted2:#647082;
+    --accent:#3b82f6; --accent2:#8b5cf6; --green:#10b981; --amber:#f59e0b;
+    --red:#ef4444; --teal:#14b8a6;
+    --radius:12px; --shadow:0 8px 24px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:linear-gradient(160deg,#0d1218,#0f1419 40%,#11171f);
+    color:var(--text); font:14px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font:inherit;cursor:pointer}
+  /* ---- Layout ---- */
+  .app{display:flex;flex-direction:column;height:100vh}
+  header.topbar{
+    display:flex;align-items:center;gap:14px;padding:12px 18px;
+    background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:.2px}
+  .brand .logo{
+    width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));font-size:16px
+  }
+  .brand small{font-weight:500;color:var(--muted);font-size:11px;display:block;line-height:1}
+  .conn{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted2);box-shadow:0 0 0 0 rgba(16,185,129,.5)}
+  .dot.on{background:var(--green);animation:pulse 2s infinite}
+  .dot.off{background:var(--red)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.45)}70%{box-shadow:0 0 0 7px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+
+  .main{display:flex;flex:1;min-height:0}
+  /* ---- Inbox (links) ---- */
+  .inbox{width:380px;flex-shrink:0;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg)}
+  .inbox-head{padding:12px 14px 8px;border-bottom:1px solid var(--border)}
+  .search{width:100%;padding:9px 12px;background:var(--panel);border:1px solid var(--border);
+    border-radius:9px;color:var(--text);outline:none}
+  .search:focus{border-color:var(--accent)}
+  .tabs{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+  .tab{padding:5px 11px;border-radius:20px;border:1px solid var(--border);background:transparent;
+    color:var(--muted);font-size:12px;font-weight:600}
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .tab .cnt{opacity:.7;margin-left:4px}
+  .list{flex:1;overflow-y:auto;padding:8px}
+  .msg{padding:11px 12px;border-radius:11px;border:1px solid transparent;margin-bottom:6px;
+    background:var(--panel);transition:.12s;position:relative}
+  .msg:hover{background:var(--panel2)}
+  .msg.sel{border-color:var(--accent);background:var(--panel2)}
+  .msg.unread::before{content:"";position:absolute;left:4px;top:50%;transform:translateY(-50%);
+    width:4px;height:26px;border-radius:3px;background:var(--accent)}
+  .msg-top{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+  .msg-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+  .msg-time{font-size:11px;color:var(--muted2);flex-shrink:0}
+  .msg-prev{font-size:12.5px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;
+    -webkit-box-orient:vertical;overflow:hidden}
+  .msg-badges{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+  .badge{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.2px}
+  .badge.persoenlich_offen{background:rgba(245,158,11,.16);color:#fbbf24}
+  .badge.sprachmemo_offen{background:rgba(139,92,246,.18);color:#b794ff}
+  .badge.automatisch_beantwortet{background:rgba(20,184,166,.16);color:#2dd4bf}
+  .badge.antwort_bereit{background:rgba(59,130,246,.18);color:#7eacff}
+  .badge.beantwortet{background:rgba(100,116,130,.2);color:#9fb0c2}
+  .badge.task{background:rgba(16,185,129,.16);color:#34d399}
+  .empty{padding:40px 20px;text-align:center;color:var(--muted2);font-size:13px}
+
+  /* ---- Reader (rechts) ---- */
+  .reader{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg2)}
+  .reader-empty{flex:1;display:grid;place-items:center;color:var(--muted2);text-align:center;padding:30px}
+  .reader-empty .big{font-size:42px;margin-bottom:10px;opacity:.5}
+  .rd-head{padding:16px 22px;border-bottom:1px solid var(--border);flex-shrink:0}
+  .rd-name{font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px}
+  .rd-meta{font-size:12.5px;color:var(--muted);margin-top:4px;display:flex;gap:14px;flex-wrap:wrap}
+  .rd-body{flex:1;overflow-y:auto;padding:22px}
+  .bubble{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    border-top-left-radius:4px;padding:14px 16px;max-width:680px;white-space:pre-wrap;
+    word-break:break-word;font-size:15px}
+  .audio-card{margin-top:14px;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;padding:14px 16px;max-width:680px}
+  .audio-card .lbl{font-size:12px;color:var(--accent2);font-weight:700;margin-bottom:9px;
+    display:flex;align-items:center;gap:7px}
+  audio{width:100%;height:38px;filter:invert(.92) hue-rotate(180deg)}
+  .audio-err{font-size:12.5px;color:var(--amber)}
+  .answer-shown{margin-top:18px;max-width:680px}
+  .answer-shown .lbl{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;
+    letter-spacing:.5px;margin-bottom:6px}
+  .bubble.out{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.3);
+    border-top-left-radius:14px;border-top-right-radius:4px;margin-left:auto}
+
+  /* ---- Composer ---- */
+  .composer{border-top:1px solid var(--border);padding:14px 22px;flex-shrink:0;background:var(--bg2)}
+  .composer textarea{width:100%;min-height:78px;max-height:200px;resize:vertical;padding:12px 14px;
+    background:var(--panel);border:1px solid var(--border);border-radius:11px;color:var(--text);
+    outline:none;font:inherit}
+  .composer textarea:focus{border-color:var(--accent)}
+  .composer-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+  .btn{padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);
+    color:var(--text);font-weight:600;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{background:#2a3645}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{background:#2f73e6}
+  .btn.task{background:transparent;border-color:rgba(16,185,129,.4);color:#34d399}
+  .btn.task:hover{background:rgba(16,185,129,.12)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .spacer{flex:1}
+  .hint{font-size:11.5px;color:var(--muted2)}
+
+  /* ---- Modal (Aufgabe → Quantus) ---- */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;place-items:center;z-index:50}
+  .modal-bg.show{display:grid}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:16px;width:min(480px,92vw);
+    box-shadow:var(--shadow);overflow:hidden}
+  .modal h3{margin:0;padding:16px 20px;border-bottom:1px solid var(--border);font-size:16px;
+    display:flex;align-items:center;gap:9px}
+  .modal-body{padding:18px 20px;display:flex;flex-direction:column;gap:13px}
+  .field label{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:5px}
+  .field input,.field textarea,.field select{width:100%;padding:9px 12px;background:var(--bg);
+    border:1px solid var(--border);border-radius:9px;color:var(--text);outline:none;font:inherit}
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent)}
+  .field textarea{resize:vertical;min-height:64px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+
+  /* ---- Toast ---- */
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:11px 18px;
+    border-radius:11px;box-shadow:var(--shadow);opacity:0;transition:.25s;z-index:80;font-weight:600;
+    display:flex;align-items:center;gap:9px;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.ok{border-color:rgba(16,185,129,.5)}
+  .toast.err{border-color:rgba(239,68,68,.5)}
+
+  /* ---- Setup-Banner ---- */
+  .setup{max-width:720px;margin:8vh auto;padding:28px 32px;background:var(--panel);
+    border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}
+  .setup h1{margin:0 0 6px;font-size:22px}
+  .setup p{color:var(--muted)}
+  .setup code{background:#0c1117;padding:2px 7px;border-radius:6px;color:#7eacff;font-size:13px}
+  .setup pre{background:#0c1117;border:1px solid var(--border);border-radius:10px;padding:14px 16px;
+    overflow:auto;color:#cdd6e0;font-size:12.5px;line-height:1.5}
+
+  @media(max-width:780px){
+    .inbox{width:100%;position:absolute;inset:0;z-index:10;background:var(--bg)}
+    .inbox.hide{display:none}
+    .reader{position:absolute;inset:0;z-index:5}
+    .back-btn{display:inline-flex !important}
+  }
+  .back-btn{display:none;margin-right:4px}
+
+  /* ---- Topbar-Aktionen: Verfügbarkeit + Einstellungen ---- */
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .topbar-right .conn{margin-left:0}
+  .avail-pill{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:20px;
+    border:1px solid var(--border);background:var(--panel2);color:var(--text);font-weight:700;font-size:12.5px}
+  .avail-pill .ad{width:9px;height:9px;border-radius:50%;background:var(--muted2)}
+  .avail-pill.verfuegbar{border-color:rgba(16,185,129,.45);color:#34d399}
+  .avail-pill.verfuegbar .ad{background:var(--green)}
+  .avail-pill.beschaeftigt{border-color:rgba(245,158,11,.5);color:#fbbf24}
+  .avail-pill.beschaeftigt .ad{background:var(--amber)}
+  .avail-pill small{font-weight:500;opacity:.8}
+  .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+    color:var(--text);font-size:16px;display:grid;place-items:center}
+  .icon-btn:hover{background:#2a3645}
+
+  /* ---- Einstellungen-Modal ---- */
+  .modal.wide{width:min(560px,94vw);max-height:90vh;display:flex;flex-direction:column}
+  .modal.wide .modal-body{overflow-y:auto}
+  .set-section{border:1px solid var(--border);border-radius:12px;padding:14px 15px;background:var(--bg)}
+  .set-section h4{margin:0 0 10px;font-size:13.5px;display:flex;align-items:center;gap:8px}
+  .set-note{font-size:11.5px;color:var(--muted2);margin-top:7px;line-height:1.5}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+  .seg button{padding:8px 16px;background:var(--bg);color:var(--muted);border:0;font-weight:700;font-size:13px}
+  .seg button.on.v{background:var(--green);color:#06281d}
+  .seg button.on.b{background:var(--amber);color:#3a2706}
+  .preview{margin-top:8px;padding:9px 11px;border-radius:9px;background:var(--panel2);border:1px dashed var(--border);
+    font-size:12.5px;color:var(--muted);white-space:pre-wrap}
+  .key-row{display:flex;gap:8px;align-items:center}
+  .key-row input{flex:1}
+  .key-state{font-size:11.5px;font-weight:700}
+  .key-state.ok{color:#34d399}
+  .key-state.no{color:var(--muted2)}
+
+  /* ---- Zusammenfassen ---- */
+  .summarize-bar{margin-top:12px}
+  .btn.ai{background:rgba(139,92,246,.14);border-color:rgba(139,92,246,.4);color:#b794ff}
+  .btn.ai:hover:not(:disabled){background:rgba(139,92,246,.22)}
+  .badge.grp{background:rgba(59,130,246,.16);color:#7eacff}
+  .summary-out{white-space:pre-wrap;font-size:14px;line-height:1.6}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);
+    border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite;vertical-align:-2px}
+  @keyframes rot{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- ============================================================= -->
+<!--  FIREBASE-CONFIG  —  PLATZHALTER                              -->
+<!--  Hier deine echten Werte aus der Firebase-Console eintragen.  -->
+<!--  Gleiches Projekt wie Quantus (jupidu-36804).                 -->
+<!--  databaseURL ist fuer die Realtime Database ZWINGEND noetig.  -->
+<!-- ============================================================= -->
+<script>
+const firebaseConfig = {
+  apiKey:            "AIzaSyC6xVo-wmXC4JjG7qMQnOExIJU-UDvBluE",
+  authDomain:        "jupidu-36804.firebaseapp.com",
+  databaseURL:       "https://jupidu-36804-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "jupidu-36804",
+  storageBucket:     "jupidu-36804.firebasestorage.app",
+  messagingSenderId: "11390726952",
+  appId:             "1:11390726952:web:aba2f101b6c5ca2bc5561d",
+  measurementId:     "G-LT97CCT5DF"
+};
+
+// ---- Konfiguration / Konstanten -------------------------------------------
+const CONFIG = {
+  inboxPath:        "communicator_inbox",   // n8n schreibt eingehende WhatsApp-Nachrichten hierhin
+  quantusTaskPath:  "quantus_task_inbox",   // Aufgaben-Queue -> wird von Quantus importiert
+  // Aufloesung der Sprachmemo-Audiodatei:
+  //  - ist audioId bereits eine URL -> wird direkt genutzt
+  //  - sonst wird dieser Storage-Pfad verwendet ({audioId} wird ersetzt)
+  audioPathTemplate: "communicator_audio/{audioId}",
+  settingsPath:     "settings",                 // /settings/... (von n8n gelesen)
+  summaryModel:     "gpt-4o-mini",              // OpenAI-Modell fuer die Zusammenfassung
+  openaiKeyStorage: "communicator_openai_key",  // localStorage-Key (NIE in RTDB / Code!)
+  locale: "de-CH"
+};
+
+const STATUS = {
+  persoenlich_offen:        { label: "Persönlich · offen",        icon: "✉️" },
+  sprachmemo_offen:         { label: "Sprachmemo · offen",        icon: "🎤" },
+  automatisch_beantwortet:  { label: "Automatisch beantwortet",   icon: "🤖" },
+  antwort_bereit:           { label: "Antwort bereit",            icon: "📤" },
+  beantwortet:              { label: "Beantwortet",               icon: "✅" }
+};
+</script>
+
+<div id="root"></div>
+
+<script>
+"use strict";
+// ===========================================================================
+//  Communicator Pro  —  WhatsApp-Posteingang (Firebase RTDB) + Quantus-Anbindung
+// ===========================================================================
+
+const $  = (s, r=document) => r.querySelector(s);
+const esc = (s) => String(s==null?"":s);
+function h(tag, attrs={}, ...kids){
+  const el = document.createElement(tag);
+  for (const k in attrs){
+    if (k === "class") el.className = attrs[k];
+    else if (k === "text") el.textContent = attrs[k];
+    else if (k.startsWith("on") && typeof attrs[k] === "function") el.addEventListener(k.slice(2), attrs[k]);
+    else if (attrs[k] != null) el.setAttribute(k, attrs[k]);
+  }
+  for (const kid of kids){ if (kid==null) continue; el.append(kid.nodeType ? kid : document.createTextNode(kid)); }
+  return el;
+}
+
+// ---- App-State ------------------------------------------------------------
+const state = {
+  messages: [],          // [{id, ...fields}]
+  selectedId: null,
+  filter: "offen",       // offen | sprachmemo | beantwortet | alle
+  search: "",
+  audioCache: {},        // id -> resolved url
+  settings: null         // /settings aus RTDB (availability, awayMessage, ...)
+};
+
+let db = null, storage = null, app = null;
+
+// ---- Boot -----------------------------------------------------------------
+function configFilled(){
+  return !!(firebaseConfig.databaseURL && firebaseConfig.apiKey && firebaseConfig.projectId);
+}
+
+function boot(){
+  if (!configFilled()){ renderSetup(); return; }
+  try{
+    app = firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    try { storage = firebase.storage(); } catch(e){ console.warn("Storage nicht verfügbar:", e.message); }
+  }catch(e){
+    renderError("Firebase-Init fehlgeschlagen: " + e.message);
+    return;
+  }
+  renderShell();
+  watchConnection();
+  watchInbox();
+  watchSettings();
+}
+
+// ---- Live-Listener: Posteingang ------------------------------------------
+function watchInbox(){
+  db.ref(CONFIG.inboxPath).on("value", (snap) => {
+    const val = snap.val() || {};
+    state.messages = Object.keys(val).map(id => ({ id, ...val[id] }))
+      .sort((a,b) => tsNum(b.timestamp) - tsNum(a.timestamp));
+    // Auswahl beibehalten falls noch vorhanden, sonst nichts
+    if (state.selectedId && !state.messages.find(m => m.id === state.selectedId)) state.selectedId = null;
+    renderList();
+    renderReader();
+  }, (err) => {
+    console.error(err);
+    toast("Lesen fehlgeschlagen: " + err.message + " (Datenbank-Regeln prüfen)", "err", 6000);
+  });
+}
+
+function watchConnection(){
+  db.ref(".info/connected").on("value", (s) => {
+    const on = s.val() === true;
+    const dot = $("#connDot"), txt = $("#connTxt");
+    if (dot){ dot.className = "dot " + (on ? "on" : "off"); }
+    if (txt){ txt.textContent = on ? "Verbunden" : "Getrennt"; }
+  });
+}
+
+// ===========================================================================
+//  Helpers
+// ===========================================================================
+function tsNum(ts){
+  if (ts == null) return 0;
+  if (typeof ts === "number") return ts < 1e12 ? ts*1000 : ts;       // Sekunden -> ms
+  const n = Date.parse(ts); return isNaN(n) ? 0 : n;
+}
+function fmtTime(ts){
+  const n = tsNum(ts); if (!n) return "";
+  const d = new Date(n), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) return d.toLocaleTimeString(CONFIG.locale, {hour:"2-digit", minute:"2-digit"});
+  return d.toLocaleString(CONFIG.locale, {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"});
+}
+function isSprachmemo(m){ return m.type === "sprachmemo" || m.status === "sprachmemo_offen" || !!m.audioId; }
+function isOpen(m){ return m.status === "persoenlich_offen" || m.status === "sprachmemo_offen"; }
+function statusInfo(s){ return STATUS[s] || { label: s || "—", icon: "•" }; }
+
+function matchesFilter(m){
+  const f = state.filter;
+  if (f === "offen") return isOpen(m);
+  if (f === "sprachmemo") return isSprachmemo(m);
+  if (f === "beantwortet") return ["automatisch_beantwortet","antwort_bereit","beantwortet"].includes(m.status);
+  return true; // alle
+}
+function matchesSearch(m){
+  if (!state.search) return true;
+  const q = state.search.toLowerCase();
+  return [m.name, m.from, m.text].some(v => String(v||"").toLowerCase().includes(q));
+}
+function visibleMessages(){ return state.messages.filter(m => matchesFilter(m) && matchesSearch(m)); }
+function selected(){ return state.messages.find(m => m.id === state.selectedId) || null; }
+
+// ===========================================================================
+//  Render
+// ===========================================================================
+function renderShell(){
+  $("#root").innerHTML = "";
+  const root = $("#root");
+
+  const topbar = h("header", {class:"topbar"},
+    h("div", {class:"brand"},
+      h("span", {class:"logo"}, "💬"),
+      h("div", {}, h("div",{},"Communicator Pro"), h("small",{},"WhatsApp-Posteingang"))
+    ),
+    h("div", {class:"topbar-right"},
+      h("button", {class:"avail-pill", id:"availPill", title:"Verfügbarkeit umschalten",
+        onclick:toggleAvailability}, "…"),
+      h("button", {class:"icon-btn", id:"gearBtn", title:"Einstellungen", onclick:openSettings}, "⚙️"),
+      h("div", {class:"conn"},
+        h("span", {id:"connDot", class:"dot"}),
+        h("span", {id:"connTxt"}, "Verbinde…")
+      )
+    )
+  );
+
+  const inbox = h("aside", {class:"inbox", id:"inbox"},
+    h("div", {class:"inbox-head"},
+      h("input", {class:"search", id:"search", placeholder:"Suchen (Name, Nummer, Text)…",
+        oninput:(e)=>{ state.search = e.target.value; renderList(); }}),
+      h("div", {class:"tabs", id:"tabs"})
+    ),
+    h("div", {class:"list", id:"list"})
+  );
+
+  const reader = h("section", {class:"reader", id:"reader"});
+
+  root.append(topbar, h("div",{class:"main"}, inbox, reader));
+  root.append(buildModal(), buildSettingsModal(), buildSummaryModal(), h("div",{class:"toast", id:"toast"}));
+
+  renderTabs();
+  renderList();
+  renderReader();
+  renderAvailabilityPill();
+}
+
+function renderTabs(){
+  const defs = [
+    ["offen","Offen"], ["sprachmemo","Sprachmemos"], ["beantwortet","Beantwortet"], ["alle","Alle"]
+  ];
+  const wrap = $("#tabs"); if (!wrap) return;
+  wrap.innerHTML = "";
+  for (const [key,label] of defs){
+    const cnt = state.messages.filter(m => {
+      const save = state.filter; state.filter = key; const r = matchesFilter(m); state.filter = save; return r;
+    }).length;
+    wrap.append(h("button", {class:"tab"+(state.filter===key?" active":""),
+      onclick:()=>{ state.filter = key; renderTabs(); renderList(); }},
+      h("span",{},label), h("span",{class:"cnt"}, "("+cnt+")")
+    ));
+  }
+}
+
+function renderList(){
+  renderTabs();
+  const list = $("#list"); if (!list) return;
+  list.innerHTML = "";
+  const items = visibleMessages();
+  if (!items.length){
+    list.append(h("div",{class:"empty"}, "Keine Nachrichten in dieser Ansicht."));
+    return;
+  }
+  for (const m of items){
+    const open = isOpen(m);
+    const badges = h("div",{class:"msg-badges"});
+    badges.append(h("span",{class:"badge "+(m.status||"")}, statusInfo(m.status).icon+" "+statusInfo(m.status).label));
+    if (isGroupMsg(m)) badges.append(h("span",{class:"badge grp"}, "👥 Gruppe"));
+    if (m.quantusTaskCreatedAt) badges.append(h("span",{class:"badge task"}, "✓ Quantus"));
+
+    const item = h("div",{class:"msg"+(m.id===state.selectedId?" sel":"")+(open?" unread":""),
+        onclick:()=>{ state.selectedId = m.id; state.audioCache={}; renderList(); renderReader();
+                      const ib=$("#inbox"); if(ib) ib.classList.add("hide"); }},
+      h("div",{class:"msg-top"},
+        h("span",{class:"msg-name"}, (isGroupMsg(m)?"👥 ":"")+(isSprachmemo(m)?"🎤 ":"")+ (esc(displayName(m)) || "Unbekannt")),
+        h("span",{class:"msg-time"}, fmtTime(m.timestamp))
+      ),
+      h("div",{class:"msg-prev"}, esc(m.text) || (isSprachmemo(m) ? "[Sprachnachricht]" : "—")),
+      badges
+    );
+    list.append(item);
+  }
+}
+
+function renderReader(){
+  const reader = $("#reader"); if (!reader) return;
+  const m = selected();
+  reader.innerHTML = "";
+  if (!m){
+    reader.append(h("div",{class:"reader-empty"},
+      h("div",{},
+        h("div",{class:"big"},"📨"),
+        h("div",{}, "Wähle links eine Nachricht aus.")
+      )
+    ));
+    return;
+  }
+
+  // Kopf
+  const grp = isGroupMsg(m);
+  const openFromSender = state.messages.filter(x => sameSender(x, m) && isOpen(x));
+  const head = h("div",{class:"rd-head"},
+    h("div",{class:"rd-name"},
+      h("button",{class:"btn back-btn", onclick:()=>{ const ib=$("#inbox"); if(ib) ib.classList.remove("hide"); }}, "‹"),
+      (grp?"👥 ":"")+(esc(displayName(m)) || "Unbekannt"),
+      grp ? h("span",{class:"badge grp"}, "Gruppe") : null
+    ),
+    h("div",{class:"rd-meta"},
+      h("span",{}, "📱 "+(esc(m.from)||"—")),
+      h("span",{}, "🕑 "+(fmtTime(m.timestamp)||"—")),
+      h("span",{}, statusInfo(m.status).icon+" "+statusInfo(m.status).label),
+      m.type ? h("span",{}, "Typ: "+esc(m.type)) : null
+    ),
+    openFromSender.length >= 2 ? h("div",{class:"summarize-bar"}, buildSummarizeBtn(m, openFromSender.length)) : null
+  );
+
+  // Body
+  const body = h("div",{class:"rd-body"});
+  if (m.text) body.append(h("div",{class:"bubble"}, esc(m.text)));
+  else if (isSprachmemo(m)) body.append(h("div",{class:"bubble"}, "🎤 Sprachnachricht"));
+
+  if (isSprachmemo(m)){
+    const card = h("div",{class:"audio-card", id:"audioCard"},
+      h("div",{class:"lbl"}, "🎤 Sprachmemo"),
+      h("div",{id:"audioSlot"}, h("span",{class:"hint"}, "Lade Audio…"))
+    );
+    body.append(card);
+    loadAudio(m);
+  }
+
+  // Bereits vorhandene Antwort anzeigen
+  if (m.antwortText){
+    body.append(h("div",{class:"answer-shown"},
+      h("div",{class:"lbl"}, "Deine Antwort"+(m.antwortTimestamp?" · "+fmtTime(m.antwortTimestamp):"")),
+      h("div",{class:"bubble out"}, esc(m.antwortText))
+    ));
+  }
+
+  // Composer
+  const composer = buildComposer(m);
+
+  reader.append(head, body, composer);
+}
+
+function buildComposer(m){
+  const ta = h("textarea",{id:"reply", placeholder:"Antwort schreiben… (wird via n8n über WhatsApp gesendet)"},
+    );
+  ta.value = m.antwortText && m.status === "antwort_bereit" ? m.antwortText : "";
+
+  const sendBtn = h("button",{class:"btn primary", id:"sendBtn",
+    onclick:()=>sendReply(m)}, "📤 Antwort senden");
+
+  const taskBtn = h("button",{class:"btn task", onclick:()=>openTaskModal(m)},
+    "✅ Als Aufgabe an Quantus");
+
+  return h("div",{class:"composer"},
+    ta,
+    h("div",{class:"composer-row"},
+      sendBtn,
+      taskBtn,
+      h("span",{class:"spacer"}),
+      h("span",{class:"hint"}, "Status → ", h("code",{},"antwort_bereit"))
+    )
+  );
+}
+
+// ---- Audio laden ----------------------------------------------------------
+async function loadAudio(m){
+  const slot = () => $("#audioSlot");
+  try{
+    const url = await resolveAudioUrl(m);
+    const el = slot(); if (!el) return;
+    el.innerHTML = "";
+    if (!url){ el.append(h("div",{class:"audio-err"}, "⚠️ Audio nicht gefunden (audioId / Storage-Pfad prüfen).")); return; }
+    const audio = h("audio",{controls:"", preload:"metadata"});
+    audio.src = url;
+    el.append(audio);
+  }catch(e){
+    const el = slot(); if (el){ el.innerHTML=""; el.append(h("div",{class:"audio-err"}, "⚠️ "+e.message)); }
+  }
+}
+async function resolveAudioUrl(m){
+  if (m.audioUrl) return m.audioUrl;
+  const id = m.audioId;
+  if (!id) return null;
+  if (state.audioCache[id]) return state.audioCache[id];
+  let url = null;
+  if (/^https?:\/\//i.test(id)) url = id;
+  else if (storage){
+    const path = CONFIG.audioPathTemplate.replace("{audioId}", id);
+    url = await storage.ref(path).getDownloadURL();
+  }
+  if (url) state.audioCache[id] = url;
+  return url;
+}
+
+// ===========================================================================
+//  Aktionen
+// ===========================================================================
+async function sendReply(m){
+  const ta = $("#reply"); const text = (ta?.value || "").trim();
+  if (!text){ toast("Bitte zuerst eine Antwort schreiben.", "err"); ta?.focus(); return; }
+  const btn = $("#sendBtn"); if (btn){ btn.disabled = true; btn.textContent = "Sende…"; }
+  try{
+    await db.ref(CONFIG.inboxPath + "/" + m.id).update({
+      status: "antwort_bereit",
+      antwortText: text,
+      antwortTimestamp: firebase.database.ServerValue.TIMESTAMP,
+      antwortBy: "communicator_pro"
+    });
+    toast("Antwort gespeichert → n8n sendet via WhatsApp.", "ok");
+  }catch(e){
+    toast("Senden fehlgeschlagen: " + e.message, "err", 6000);
+    if (btn){ btn.disabled = false; btn.textContent = "📤 Antwort senden"; }
+  }
+}
+
+// ---- Aufgabe -> Quantus ---------------------------------------------------
+function openTaskModal(m){
+  const titleGuess = (m.text || (isSprachmemo(m) ? ("Sprachmemo von " + (m.name||m.from||"")) : "")).slice(0,120).trim()
+                     || ("Nachricht von " + (m.name||m.from||"WhatsApp"));
+  $("#tTitle").value = titleGuess;
+  $("#tDesc").value  = buildTaskDescription(m);
+  $("#tPrio").value  = "3";
+  $("#tDue").value   = "";
+  const bg = $("#taskModal");
+  bg.classList.add("show");
+  bg.dataset.msgId = m.id;
+  setTimeout(()=>$("#tTitle").focus(), 50);
+}
+function buildTaskDescription(m){
+  const parts = [];
+  if (m.text) parts.push(m.text);
+  if (isSprachmemo(m) && !m.text) parts.push("🎤 Sprachnachricht (in Communicator Pro anhören).");
+  const meta = [];
+  if (m.name) meta.push("Von: " + m.name);
+  if (m.from) meta.push("WhatsApp: " + m.from);
+  if (meta.length) parts.push("\n" + meta.join("  ·  "));
+  parts.push("Quelle: Communicator Pro");
+  return parts.join("\n");
+}
+async function submitTask(){
+  const bg = $("#taskModal");
+  const msgId = bg.dataset.msgId;
+  const m = state.messages.find(x => x.id === msgId);
+  const title = ($("#tTitle").value||"").trim();
+  if (!title){ toast("Titel fehlt.", "err"); return; }
+  const prio = parseInt($("#tPrio").value, 10) || 3;
+  const due  = ($("#tDue").value || "").trim() || null;
+  const btn = $("#tSubmit"); btn.disabled = true; btn.textContent = "Lege an…";
+  try{
+    // Compact-Task in die Quantus-Queue schreiben (Importer in ai-sync uebernimmt ihn als echten Task)
+    await db.ref(CONFIG.quantusTaskPath).push({
+      title,
+      description: ($("#tDesc").value||""),
+      status: "todo",
+      priority: prio,
+      dueDate: due,
+      tags: ["WhatsApp"],
+      source: "communicator",
+      from: m?.from || null,
+      name: m?.name || null,
+      text: m?.text || null,
+      origMessageId: msgId || null,
+      createdAt: firebase.database.ServerValue.TIMESTAMP
+    });
+    // Nachricht markieren (nur Anzeige, Status bleibt unveraendert)
+    if (m) await db.ref(CONFIG.inboxPath + "/" + msgId).update({
+      quantusTaskCreatedAt: firebase.database.ServerValue.TIMESTAMP
+    });
+    closeTaskModal();
+    toast("Aufgabe an Quantus übergeben.", "ok");
+  }catch(e){
+    toast("Anlegen fehlgeschlagen: " + e.message, "err", 6000);
+    btn.disabled = false; btn.textContent = "An Quantus senden";
+  }
+}
+function closeTaskModal(){
+  const bg = $("#taskModal"); bg.classList.remove("show");
+  const btn = $("#tSubmit"); if (btn){ btn.disabled=false; btn.textContent="An Quantus senden"; }
+}
+
+function buildModal(){
+  return h("div",{class:"modal-bg", id:"taskModal", onclick:(e)=>{ if(e.target.id==="taskModal") closeTaskModal(); }},
+    h("div",{class:"modal"},
+      h("h3",{}, "✅ ", "Aufgabe an Quantus"),
+      h("div",{class:"modal-body"},
+        h("div",{class:"field"}, h("label",{},"Titel"), h("input",{id:"tTitle", type:"text"})),
+        h("div",{class:"field"}, h("label",{},"Beschreibung"), h("textarea",{id:"tDesc"})),
+        h("div",{class:"grid2"},
+          h("div",{class:"field"}, h("label",{},"Priorität"),
+            (function(){ const s=h("select",{id:"tPrio"});
+              [["1","1 · höchste"],["2","2 · hoch"],["3","3 · mittel"],["4","4 · niedrig"],["5","5 · sehr niedrig"]]
+                .forEach(([v,l])=>s.append(h("option",{value:v}, l)));
+              s.value="3"; return s; })()
+          ),
+          h("div",{class:"field"}, h("label",{},"Fällig am (optional)"), h("input",{id:"tDue", type:"date"}))
+        )
+      ),
+      h("div",{class:"modal-foot"},
+        h("button",{class:"btn", onclick:closeTaskModal}, "Abbrechen"),
+        h("button",{class:"btn primary", id:"tSubmit", onclick:submitTask}, "An Quantus senden")
+      )
+    )
+  );
+}
+
+// ---- Toast ----------------------------------------------------------------
+let toastTimer = null;
+function toast(msg, kind="", ms=3200){
+  const t = $("#toast"); if (!t) return;
+  t.textContent = msg; t.className = "toast show " + kind;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ t.className = "toast " + kind; }, ms);
+}
+
+// ---- Setup / Error-Screens ------------------------------------------------
+function renderSetup(){
+  $("#root").innerHTML = "";
+  $("#root").append(h("div",{class:"setup"},
+    h("h1",{}, "💬 Communicator Pro"),
+    h("p",{}, "Fast fertig! Trage oben in der ", h("code",{},"index.html"), " bei ",
+              h("code",{},"firebaseConfig"), " deine echten Firebase-Werte ein (gleiches Projekt wie Quantus)."),
+    h("p",{}, "Mindestens nötig: ", h("code",{},"apiKey"), ", ", h("code",{},"databaseURL"),
+              ", ", h("code",{},"projectId"), " (für Sprachmemos zusätzlich ", h("code",{},"storageBucket"), ")."),
+    h("pre",{}, document.createTextNode(
+`const firebaseConfig = {
+  apiKey:        "AIza…",
+  authDomain:    "jupidu-36804.firebaseapp.com",
+  databaseURL:   "https://jupidu-36804-default-rtdb.<region>.firebasedatabase.app",
+  projectId:     "jupidu-36804",
+  storageBucket: "jupidu-36804.firebasestorage.app",
+  …
+};`))
+  ));
+}
+function renderError(msg){
+  $("#root").innerHTML = "";
+  $("#root").append(h("div",{class:"setup"},
+    h("h1",{}, "⚠️ Fehler"),
+    h("p",{}, msg)
+  ));
+}
+
+// ===========================================================================
+//  Gruppen-Erkennung & Anzeigename
+// ===========================================================================
+function isGroupMsg(m){
+  return m.isGroup === true || m.type === "group" || m.chatType === "group"
+      || !!m.groupId || !!m.groupName || /@g\.us$/.test(String(m.from||""));
+}
+function displayName(m){
+  if (isGroupMsg(m)) return m.groupName || m.name || m.from || "Gruppe";
+  return m.name || m.from || "";
+}
+function sameSender(a, b){
+  if (isGroupMsg(a) || isGroupMsg(b)){
+    const ga = a.groupId || a.groupName || a.from, gb = b.groupId || b.groupName || b.from;
+    return !!ga && ga === gb;
+  }
+  return (a.from||"") === (b.from||"") && !!a.from;
+}
+
+// ===========================================================================
+//  Einstellungen (RTDB /settings)  +  Verfügbarkeits-Status
+// ===========================================================================
+function watchSettings(){
+  db.ref(CONFIG.settingsPath).on("value", (snap) => {
+    state.settings = snap.val() || {};
+    renderAvailabilityPill();
+    if ($("#settingsModal") && $("#settingsModal").classList.contains("show")) fillSettingsForm();
+  }, (err) => console.warn("settings read:", err.message));
+}
+function availability(){
+  const a = (state.settings && state.settings.availability) || {};
+  return { mode: a.mode === "beschaeftigt" ? "beschaeftigt" : "verfuegbar", busyUntil: a.busyUntil || null };
+}
+function renderAvailabilityPill(){
+  const pill = $("#availPill"); if (!pill) return;
+  const a = availability();
+  const busy = a.mode === "beschaeftigt";
+  pill.className = "avail-pill " + a.mode;
+  pill.innerHTML = "";
+  pill.append(h("span",{class:"ad"}));
+  pill.append(h("span",{}, busy ? "Beschäftigt" : "Verfügbar"));
+  if (busy && a.busyUntil) pill.append(h("small",{}, "bis "+fmtDateTime(a.busyUntil)));
+}
+async function toggleAvailability(){
+  const a = availability();
+  const next = a.mode === "verfuegbar" ? "beschaeftigt" : "verfuegbar";
+  await writeAvailability(next, next === "beschaeftigt" ? a.busyUntil : null);
+  toast(next === "beschaeftigt"
+    ? "Status: beschäftigt — n8n sendet Auto-Antworten."
+    : "Status: verfügbar — keine Auto-Antworten.", "ok");
+}
+async function writeAvailability(mode, busyUntil){
+  try{
+    await db.ref(CONFIG.settingsPath + "/availability").set({
+      mode, busyUntil: busyUntil || null, updatedAt: new Date().toISOString()
+    });
+  }catch(e){ toast("Speichern fehlgeschlagen: "+e.message, "err", 5000); }
+}
+
+// ---- Settings-Modal -------------------------------------------------------
+function openSettings(){ $("#settingsModal").classList.add("show"); fillSettingsForm(); }
+function closeSettings(){ $("#settingsModal").classList.remove("show"); }
+
+let _segMode = "verfuegbar";
+function setSeg(mode){
+  _segMode = mode === "beschaeftigt" ? "beschaeftigt" : "verfuegbar";
+  const v = $("#segV"), b = $("#segB"); if(!v||!b) return;
+  v.className = "v" + (_segMode==="verfuegbar"?" on":"");
+  b.className = "b" + (_segMode==="beschaeftigt"?" on":"");
+}
+function fillSettingsForm(){
+  const s = state.settings || {};
+  const a = availability();
+  setSeg(a.mode);
+  $("#sBusyUntil").value  = isoToLocalInput(a.busyUntil);
+  $("#sAway").value       = s.awayMessage || "";
+  $("#sNextReply").value  = isoToLocalInput(s.nextReplyAt);
+  $("#sGroup").value      = s.groupAwayMessage || "";
+  refreshAwayPreview();
+  const key = getOpenAIKey();
+  $("#sKey").value = key || "";
+  setKeyState(!!key);
+}
+function refreshAwayPreview(){
+  const away = ($("#sAway") && $("#sAway").value || "").trim();
+  const nextIso = ($("#sNextReply") && $("#sNextReply").value) ? localInputToIso($("#sNextReply").value) : null;
+  const next = nextIso ? fmtDateTime(nextIso) : "—";
+  const fb = away || ("Vielen Dank für deine Nachricht! Ich bin gerade nicht erreichbar und melde mich wieder am " + next + ".");
+  if ($("#awayPreview")) $("#awayPreview").textContent = "Vorschau Auto-Antwort:\n" + fb;
+  const g = ($("#sGroup") && $("#sGroup").value || "").trim();
+  if ($("#groupPreview")) $("#groupPreview").textContent = "Vorschau Gruppe:\n" + (g ? g.replace(/\{nextReplyAt\}/g, next) : "—");
+}
+async function saveSettings(){
+  const btn = $("#sSave"); if(btn){ btn.disabled=true; btn.textContent="Speichere…"; }
+  try{
+    const busyUntil = _segMode === "beschaeftigt" ? localInputToIso($("#sBusyUntil").value) : null;
+    await db.ref(CONFIG.settingsPath).update({
+      availability:     { mode: _segMode, busyUntil: busyUntil, updatedAt: new Date().toISOString() },
+      awayMessage:      ($("#sAway").value||"").trim(),
+      nextReplyAt:      localInputToIso($("#sNextReply").value),
+      groupAwayMessage: ($("#sGroup").value||"").trim()
+    });
+    toast("Einstellungen gespeichert.", "ok");
+    closeSettings();
+  }catch(e){ toast("Speichern fehlgeschlagen: "+e.message, "err", 5000); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent="Speichern"; } }
+}
+function buildSettingsModal(){
+  const seg = h("div",{class:"seg"},
+    h("button",{id:"segV", class:"v", onclick:()=>setSeg("verfuegbar")}, "Verfügbar"),
+    h("button",{id:"segB", class:"b", onclick:()=>setSeg("beschaeftigt")}, "Beschäftigt")
+  );
+  return h("div",{class:"modal-bg", id:"settingsModal", onclick:(e)=>{ if(e.target.id==="settingsModal") closeSettings(); }},
+    h("div",{class:"modal wide"},
+      h("h3",{}, "⚙️ Einstellungen"),
+      h("div",{class:"modal-body"},
+        h("div",{class:"set-section"},
+          h("h4",{}, "🟢 Verfügbarkeit"),
+          seg,
+          h("div",{class:"field", style:"margin-top:11px"},
+            h("label",{}, "Beschäftigt bis (optional — leer = bis manuell geändert)"),
+            h("input",{id:"sBusyUntil", type:"datetime-local"})
+          ),
+          h("div",{class:"set-note"}, "Nur im Status „Beschäftigt“ sendet n8n automatische Antworten. „Verfügbar“ = keine Auto-Antworten.")
+        ),
+        h("div",{class:"set-section"},
+          h("h4",{}, "✉️ Abwesenheitsmeldung"),
+          h("div",{class:"field"},
+            h("label",{}, "Eigener Text (leer = generischer Text mit Termin)"),
+            h("textarea",{id:"sAway", placeholder:"z.B. Danke für deine Nachricht! Ich bin gerade nicht erreichbar …", oninput:refreshAwayPreview})
+          ),
+          h("div",{class:"field", style:"margin-top:11px"},
+            h("label",{}, "Nächster Antworttermin"),
+            h("input",{id:"sNextReply", type:"datetime-local", oninput:refreshAwayPreview})
+          ),
+          h("div",{class:"preview", id:"awayPreview"})
+        ),
+        h("div",{class:"set-section"},
+          h("h4",{}, "👥 Gruppen-Antwort"),
+          h("div",{class:"field"},
+            h("label",{}, "Einmalige Gruppen-Auto-Antwort ", h("span",{class:"hint"}, "· Platzhalter {nextReplyAt}")),
+            h("textarea",{id:"sGroup", placeholder:"Hallo zusammen, ich antworte euch am {nextReplyAt}.", oninput:refreshAwayPreview})
+          ),
+          h("div",{class:"preview", id:"groupPreview"})
+        ),
+        h("div",{class:"set-section"},
+          h("h4",{}, "🧠 OpenAI-API-Key (nur lokal)"),
+          h("div",{class:"key-row"},
+            h("input",{id:"sKey", type:"password", placeholder:"sk-…", autocomplete:"off"}),
+            h("button",{class:"btn", onclick:saveKey}, "Speichern"),
+            h("button",{class:"btn", onclick:clearKey}, "Löschen")
+          ),
+          h("div",{style:"margin-top:8px"}, h("span",{id:"keyState", class:"key-state no"}, "Kein Key hinterlegt")),
+          h("div",{class:"set-note"}, "Wird ausschließlich in deinem Browser (localStorage) gespeichert — niemals im Code oder in der RTDB. Modell: "+CONFIG.summaryModel+".")
+        )
+      ),
+      h("div",{class:"modal-foot"},
+        h("button",{class:"btn", onclick:closeSettings}, "Schließen"),
+        h("button",{class:"btn primary", id:"sSave", onclick:saveSettings}, "Speichern")
+      )
+    )
+  );
+}
+
+// ---- OpenAI-Key (nur localStorage, nie in RTDB) ---------------------------
+function getOpenAIKey(){ try { return localStorage.getItem(CONFIG.openaiKeyStorage) || ""; } catch(e){ return ""; } }
+function setKeyState(has){
+  const el = $("#keyState"); if(!el) return;
+  el.className = "key-state " + (has?"ok":"no");
+  el.textContent = has ? "✓ Key hinterlegt (lokal)" : "Kein Key hinterlegt";
+}
+function saveKey(){
+  const v = ($("#sKey").value||"").trim();
+  try{
+    if (v) localStorage.setItem(CONFIG.openaiKeyStorage, v);
+    else localStorage.removeItem(CONFIG.openaiKeyStorage);
+  }catch(e){ toast("localStorage nicht verfügbar.", "err"); return; }
+  setKeyState(!!v);
+  toast(v ? "OpenAI-Key lokal gespeichert." : "OpenAI-Key entfernt.", "ok");
+  if (selected()) renderReader();
+}
+function clearKey(){
+  try{ localStorage.removeItem(CONFIG.openaiKeyStorage); }catch(e){}
+  if ($("#sKey")) $("#sKey").value = "";
+  setKeyState(false);
+  toast("OpenAI-Key entfernt.", "ok");
+  if (selected()) renderReader();
+}
+
+// ===========================================================================
+//  Zusammenfassung mehrerer Nachrichten (OpenAI gpt-4o-mini)
+// ===========================================================================
+function buildSummarizeBtn(m, count){
+  const hasKey = !!getOpenAIKey();
+  const btn = h("button",{class:"btn ai", onclick:()=>openSummary(m)},
+    "🧠 "+count+" Nachrichten zusammenfassen");
+  if (!hasKey){
+    btn.disabled = true;
+    btn.title = "OpenAI-Key in den Einstellungen (⚙️) hinterlegen";
+    btn.append(document.createTextNode("  ·  Key nötig"));
+  }
+  return btn;
+}
+function openSummary(m){
+  if (!getOpenAIKey()){ toast("Kein OpenAI-Key — bitte in den Einstellungen (⚙️) hinterlegen.", "err", 5000); return; }
+  const msgs = state.messages.filter(x => sameSender(x, m) && isOpen(x))
+    .sort((a,b)=>tsNum(a.timestamp)-tsNum(b.timestamp));
+  $("#summaryWho").textContent = displayName(m);
+  const out = $("#summaryOut"); out.innerHTML = "";
+  out.append(h("div",{class:"hint"}, h("span",{class:"spin"}), " Erstelle Zusammenfassung von "+msgs.length+" Nachrichten…"));
+  $("#summaryModal").classList.add("show");
+  runSummary(m, msgs);
+}
+function closeSummary(){ $("#summaryModal").classList.remove("show"); }
+async function runSummary(m, msgs){
+  const out = $("#summaryOut");
+  try{
+    const lines = msgs.map(x => "["+fmtDateTime(tsToIso(x.timestamp))+"] " +
+      (x.text || (isSprachmemo(x) ? "(Sprachnachricht)" : "(kein Text)"))).join("\n");
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+getOpenAIKey() },
+      body: JSON.stringify({
+        model: CONFIG.summaryModel,
+        temperature: 0.3,
+        max_tokens: 400,
+        messages:[
+          {role:"system", content:"Du fasst eingegangene WhatsApp-Nachrichten knapp auf Deutsch zusammen. Gib 2–5 kurze Stichpunkte mit den Kernaussagen und markiere offene Fragen oder To-dos klar."},
+          {role:"user", content:"Nachrichten von "+displayName(m)+":\n\n"+lines}
+        ]
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error((data && data.error && data.error.message) || ("HTTP "+resp.status));
+    const text = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || "").trim() || "(keine Antwort erhalten)";
+    out.innerHTML = "";
+    out.append(h("div",{class:"summary-out"}, text));
+  }catch(e){
+    out.innerHTML = "";
+    out.append(h("div",{class:"audio-err"}, "⚠️ "+e.message+" (Key/Netz/CORS prüfen)"));
+  }
+}
+function buildSummaryModal(){
+  return h("div",{class:"modal-bg", id:"summaryModal", onclick:(e)=>{ if(e.target.id==="summaryModal") closeSummary(); }},
+    h("div",{class:"modal wide"},
+      h("h3",{}, "🧠 Zusammenfassung — ", h("span",{id:"summaryWho"})),
+      h("div",{class:"modal-body"},
+        h("div",{class:"set-section"}, h("div",{id:"summaryOut"}))
+      ),
+      h("div",{class:"modal-foot"},
+        h("button",{class:"btn", onclick:()=>{ const t=($("#summaryOut").textContent||""); if(navigator.clipboard) navigator.clipboard.writeText(t); toast("Kopiert.", "ok"); }}, "Kopieren"),
+        h("button",{class:"btn primary", onclick:closeSummary}, "Schließen")
+      )
+    )
+  );
+}
+
+// ---- Datum/Zeit-Helfer ----------------------------------------------------
+function tsToIso(ts){ const n=tsNum(ts); return n ? new Date(n).toISOString() : null; }
+function fmtDateTime(iso){
+  if (!iso) return "—";
+  const d = new Date(iso); if (isNaN(d.getTime())) return String(iso);
+  return d.toLocaleString(CONFIG.locale, {day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit"});
+}
+function isoToLocalInput(iso){
+  if (!iso) return "";
+  const d = new Date(iso); if (isNaN(d.getTime())) return "";
+  const p = (n)=>String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());
+}
+function localInputToIso(v){
+  if (!v) return null;
+  const d = new Date(v); return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+// ---- Start ----------------------------------------------------------------
+document.addEventListener("DOMContentLoaded", boot);
+</script>
+</body>
+</html>

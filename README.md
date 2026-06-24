@@ -1,104 +1,97 @@
-# Communicator Pro
+# Communicator
 
-Single-File-Web-App (`index.html`, Vanilla JS, Firebase Web SDK) als Posteingang für
-WhatsApp-Nachrichten, die ein n8n-Workflow über die Meta Cloud API empfängt und in die
-Firebase Realtime Database schreibt. Antworten und „Sprachmemos" werden hier bearbeitet;
-markierte Nachrichten landen als Aufgabe in **Quantus**.
+Selbstgehosteter WhatsApp-Eigenbau. Single-File-Chat-Frontend (`index.html`,
+Vanilla JS, Firebase Web SDK) im **Schiefer/Leinen-Design**. Liest direkt aus
+**Firestore** (Polling) und sendet über einen **n8n-Webhook**. WhatsApp-Anbindung
+über die **Evolution API (Baileys)** auf dem VPS.
+
+> ⚠️ Evolution/Baileys verstößt gegen die WhatsApp-AGB (Sperrrisiko). Bewusst
+> akzeptiert, private Zweit-SIM, kein Geschäftsbetrieb.
 
 ```
-WhatsApp ──► Meta Cloud API ──► n8n ──► Firebase RTDB  ──►  Communicator Pro (diese App)
-                                         communicator_inbox          │
-                                                                     ├─ Antwort:  status=antwort_bereit + antwortText  ──► n8n ──► WhatsApp
-                                                                     └─ Aufgabe:  push quantus_task_inbox  ──► Quantus (ai-sync) importiert als Task
+[Kunde WhatsApp] ⇄ [Evolution API (Docker)] ⇄ [n8n (Docker)] ⇄ [Firebase: Firestore + Storage] ⇄ [HTML-Frontend (Netlify)]
+                     └─────────── selbes Docker-Netz, intern ──────────┘        Frontend LIEST Firestore,
+                              nur n8n öffentlich (HTTPS via Caddy)                SENDET an n8n-Webhook
 ```
 
-## Setup
+## Repo-Inhalt
 
-1. **Firebase-Config eintragen.** Oben in `index.html` die Konstante `firebaseConfig`
-   mit den echten Werten füllen (gleiches Projekt wie Quantus, `jupidu-36804`).
-   `databaseURL` ist für die Realtime Database **Pflicht**, `storageBucket` für die
-   Sprachmemo-Wiedergabe.
-2. **Hosten.** Reine statische Datei – z.B. auf Netlify ablegen oder lokal öffnen.
-   Kein Build-Schritt.
+| Pfad | Zweck |
+|------|-------|
+| `index.html` | **Das Programm.** Chat-Inbox (Evolution + Firestore). Auf Netlify ablegen. |
+| `deploy/` | VPS-Stack: `docker-compose.yml`, `.env.example`, `Caddyfile`, `firestore.rules`, **`SETUP.md`** (Schritt-für-Schritt). |
+| `legacy-meta-cloud-rtdb.html` | Vorgängerversion (Meta Cloud API + RTDB + Quantus). Nur Referenz. |
 
-## Datenmodell `communicator_inbox`
+## Frontend (`index.html`)
 
-Jeder Kind-Knoten (Key = Nachrichten-ID) hat die von n8n geschriebenen Felder:
+- **Kontaktliste**: Name/Nummer, letzte Nachricht, Zeit, Ungelesen-Zähler, Avatare.
+- **Chatverlauf**: Text, **Bilder**, **PDF-Dokumente**, **Sprachnachrichten** –
+  anzeigen *und* senden (📎 für Datei, 🎤 für Sprachaufnahme via MediaRecorder).
+- **Zeitstempel** + **Tages-Trenner** an jeder Nachricht.
+- **Lesebestätigungen**: Häkchen aus `status` – gesendet `✓`, zugestellt/gelesen
+  `✓✓`, gelesen zusätzlich teal eingefärbt.
+- **Volltextsuche** über alle Nachrichten (Kontakte + Nachrichtentexte).
+- **Lesen**: direkt aus Firestore per Polling (alle 4 s). Beim Öffnen eines Chats
+  wird `unread` auf 0 gesetzt (einziger Schreibzugriff des Frontends).
+- **Senden**: `POST {n8nPublicUrl}/webhook/wa-send`, Medien als Base64.
+- **Schiefer/Leinen**: dunkel per Default, 🌓 schaltet auf Leinen (hell) um
+  (in `localStorage` gemerkt). Kein Login.
 
-| Feld | Bedeutung |
-|------|-----------|
-| `from` | Absender-Telefonnummer |
-| `name` | Absender-Name |
-| `text` | Nachrichtentext |
-| `type` | z.B. `text`, `sprachmemo` |
-| `status` | `persoenlich_offen` \| `sprachmemo_offen` \| `automatisch_beantwortet` |
-| `audioId` | ID/URL der Sprachnachricht (für Wiedergabe) |
-| `timestamp` | Zeitpunkt (ms, Sekunden oder ISO) |
+### Konfiguration eintragen
 
-Beim **Antworten** schreibt die App in denselben Knoten zurück:
-`status = "antwort_bereit"`, `antwortText`, `antwortTimestamp`, `antwortBy`.
-→ Der n8n-Workflow holt Knoten mit `status = "antwort_bereit"` ab, sendet sie via
-WhatsApp und setzt den Status anschließend (z.B. auf `beantwortet`).
+Oben in `index.html` (Block „KONFIGURATION"):
 
-## Quantus-Anbindung `quantus_task_inbox`
+1. **`firebaseConfig`** – Web-Config aus der Firebase-Console (Projekt
+   `jupidu-36804`). Ist bereits mit den echten Werten gefüllt.
+2. **`CONFIG.n8nPublicUrl`** – die öffentliche n8n-URL. Platzhalter `1-2-3-4`
+   durch deine VPS-IP-mit-Bindestrichen ersetzen **oder** im laufenden Frontend
+   über ⚙️ setzen (wird in `localStorage` gespeichert).
 
-„✅ Als Aufgabe an Quantus" schreibt einen kompakten Task in `quantus_task_inbox`:
+## Datenvertrag (verbindlich – identisch im n8n-Chat)
 
-```json
-{
-  "title": "…", "description": "…", "status": "todo", "priority": 3,
-  "dueDate": null, "tags": ["WhatsApp"], "source": "communicator",
-  "from": "…", "name": "…", "text": "…", "origMessageId": "…", "createdAt": 0
-}
+Firebase-Projekt **`jupidu-36804`**, Firestore + Storage.
+
+**Collection `wa_chats`** (Doc-ID = Nummer, nur Ziffern, z. B. `41791234567`):
+```js
+{ number, name, lastText, lastTs /*ms*/, unread /*Zahl*/, updatedAt /*ms*/ }
 ```
-
-Quantus (Repo `ai-sync`, `public/index.html`) liest diese Queue live, legt pro Eintrag
-über sein bestehendes `createEntity("task", …)` einen echten Task in `entities.tasks`
-an und entfernt den Queue-Eintrag wieder. So erscheint die Aufgabe direkt in Quantus,
-ohne dass die App die Quantus-State-Datei manipulieren muss.
-
-## Einstellungen / Auto-Antwort-Steuerung (`/settings`, für n8n)
-
-Über das Zahnrad (⚙️) in der App werden Einstellungen in RTDB unter `/settings`
-abgelegt. **n8n liest diese Werte** und entscheidet im Sende-Flow über die
-automatischen Antworten (5-Minuten-Verzögerung, „nur eine Antwort bei mehreren
-Nachrichten" und Gruppen-Erkennung macht n8n selbst).
-
-| Pfad | Typ | Inhalt |
-|------|-----|--------|
-| `/settings/availability` | Objekt | `{ mode: "verfuegbar"\|"beschaeftigt", busyUntil: <ISO\|null>, updatedAt: <ISO> }` |
-| `/settings/awayMessage` | String | Eigene Abwesenheitsmeldung (leer ⇒ generischer Text mit Termin) |
-| `/settings/nextReplyAt` | String\|null | Nächster Antworttermin (ISO 8601) |
-| `/settings/groupAwayMessage` | String | Gruppen-Auto-Antwort, Platzhalter `{nextReplyAt}` wird durch den Termin ersetzt |
-
-**Auto-Antwort-Logik in n8n (Vorschlag):**
-- Nur senden, wenn `availability.mode === "beschaeftigt"` (und falls `busyUntil`
-  gesetzt: nur solange `now < busyUntil`). Bei `verfuegbar` → keine Auto-Antwort.
-- Einzelchat: `awayMessage`, falls leer → generischer Text der `nextReplyAt` nennt
-  (z.B. „Ich melde mich wieder am &lt;nextReplyAt&gt;.").
-- Gruppe: `groupAwayMessage` mit `{nextReplyAt}` ersetzt; nur **einmalig** pro Gruppe.
-
-Der OpenAI-API-Key für die „Zusammenfassen"-Funktion wird **ausschließlich im
-Browser (localStorage)** gespeichert – niemals im Code oder in der RTDB.
-
-## Firebase Realtime Database – Regeln
-
-Die App (und n8n) brauchen Lese-/Schreibrechte auf die Pfade. Beispiel
-(für den produktiven Einsatz mit Auth absichern):
-
-```json
-{
-  "rules": {
-    "communicator_inbox": { ".read": true, ".write": true },
-    "quantus_task_inbox":  { ".read": true, ".write": true },
-    "settings":            { ".read": true, ".write": true }
-  }
-}
+**Collection `wa_messages`** (Auto-ID):
+```js
+{ number, dir:"in"|"out", type:"text"|"image"|"document"|"audio",
+  text, mediaUrl, mime, fileName, ts /*ms*/, status:"sent"|"delivered"|"read", waMsgId }
 ```
+**Storage**: `wa-media/{number}/{ts}_{fileName}` → `mediaUrl` = Download-URL.
 
-## Sprachmemos
+**Senden (Frontend → n8n)**: `POST {n8nPublicUrl}/webhook/wa-send`
+```js
+// Body
+{ to /*Ziffern*/, type, text?, mediaBase64? /*reines Base64, kein data:-Prefix*/, mime?, fileName? }
+// Antwort
+{ ok:boolean, waMsgId?, error? }
+```
+**Eingang (Evolution → n8n)**: `POST {intern}/webhook/wa-incoming`
 
-Zur Wiedergabe wird `audioId` aufgelöst:
-- ist `audioId` bereits eine `http(s)`-URL → direkt abgespielt;
-- sonst über Firebase Storage unter `CONFIG.audioPathTemplate`
-  (Standard `communicator_audio/{audioId}` – bei Bedarf an das n8n-Setup anpassen).
+> **CORS-Hinweis für den n8n-Chat:** Da das Frontend (Netlify) per Browser auf den
+> n8n-Webhook postet, muss der `wa-send`-Webhook CORS erlauben
+> (`Access-Control-Allow-Origin: *`) und die `OPTIONS`-Preflight beantworten
+> (im n8n-Webhook-Node „Allowed Origins" = `*` setzen).
+
+## Firestore-Sicherheitsregeln
+
+Siehe `deploy/firestore.rules`: **Lesen frei**, das Frontend darf nur `unread`
+auf 0 setzen, sonst kein Schreibzugriff. n8n schreibt über das Admin SDK
+(Service-Account) und umgeht die Regeln. In der Firebase-Console unter
+*Firestore → Regeln* einspielen.
+
+## VPS-Stack aufsetzen
+
+Komplette Anleitung in **`deploy/SETUP.md`** (bestehendes Setup prüfen → Stack
+starten → n8n ins Netz holen → n8n auf HTTPS umstellen → Zweit-SIM per QR
+verbinden → Service-Account anlegen).
+
+### Übergabe-Werte für den n8n-Chat
+1. **n8n-URL:** `https://n8n.<VPS-IP-mit-Bindestrichen>.sslip.io`
+2. **Evolution intern:** `http://evolution_api:8080`, API-Key aus `deploy/.env`,
+   Instanz `communicator`.
+3. **Firebase:** Service-Account-JSON (`deploy/SETUP.md` zeigt, wie du ihn
+   erzeugst), Projekt `jupidu-36804`.

@@ -1,0 +1,25 @@
+# ===========================================================================
+#  Caddy-Reverse-Proxy  —  automatisches HTTPS (Let's Encrypt) über sslip.io
+#  Variablen kommen aus deploy/.env (vom docker-compose an Caddy übergeben).
+# ===========================================================================
+
+{
+	email {$ACME_EMAIL}
+	# Bei Zertifikatsproblemen zum Testen einkommentieren (Staging-CA, kein Rate-Limit):
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# ---- n8n: ÖFFENTLICH (das Netlify-Frontend ruft hier /webhook/wa-send auf) ----
+{$N8N_HOSTNAME} {
+	encode zstd gzip
+	# {$N8N_CONTAINER} = Name deines bestehenden n8n-Containers, Port 5678
+	reverse_proxy {$N8N_CONTAINER}:5678
+}
+
+# ---- Evolution-Manager-UI / -API: für QR-Pairing & n8n-Aufrufe über HTTPS ----
+#  Durch den globalen API-Key geschützt. Willst du Evolution nach dem Pairing
+#  rein intern halten, diesen Block löschen und Caddy neu laden.
+{$EVO_HOSTNAME} {
+	encode zstd gzip
+	reverse_proxy evolution_api:8080
+}

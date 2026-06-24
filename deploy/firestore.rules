@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// ===========================================================================
+//  Firestore-Sicherheitsregeln für den Communicator (Projekt jupidu-36804)
+// ---------------------------------------------------------------------------
+//  Frontend (Browser): darf ALLES LESEN, aber nur das Feld `unread` eines
+//  Chats auf 0 zurücksetzen. Sonst kein Schreibzugriff.
+//  n8n schreibt über das Firebase Admin SDK (Service-Account) und UMGEHT
+//  diese Regeln vollständig – n8n ist davon also nicht betroffen.
+//  Einspielen:  Firebase-Console -> Firestore -> Regeln  (oder `firebase deploy
+//  --only firestore:rules`).
+// ===========================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Chats/Kontakte: lesen frei; Schreiben nur "unread = 0" -------------
+    match /wa_chats/{number} {
+      allow read: if true;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unread'])
+                    && request.resource.data.unread == 0;
+      allow create, delete: if false;
+    }
+
+    // --- Nachrichten: nur lesen (Schreiben ausschließlich n8n/Admin SDK) ----
+    match /wa_messages/{msgId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // --- Alles andere gesperrt ---------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,137 @@
+# ===========================================================================
+#  Evolution-API-Stack für den Communicator  (AUFGABE 1)
+#  PostgreSQL + Redis + Evolution API v2 + Caddy (HTTPS via sslip.io)
+# ---------------------------------------------------------------------------
+#  WICHTIG – additiv zu deinem bestehenden Setup:
+#  * Dieser Stack legt ein EIGENES Docker-Netz "wa_net" an.
+#  * Dein bestehender n8n-Container wird NACHTRÄGLICH diesem Netz beigetreten
+#    (siehe deploy/SETUP.md, Schritt 5) – wir fassen deine n8n-compose NICHT an.
+#  * Caddy ist der EINZIGE Container, der die Ports 80/443 nach außen öffnet.
+#    Läuft bei dir bereits ein Reverse Proxy (Caddy/Traefik/nginx) auf 80/443,
+#    NICHT diesen Caddy starten – siehe SETUP.md (Variante B).
+#  Alle Werte kommen aus deploy/.env
+# ===========================================================================
+
+services:
+  # ---- PostgreSQL: Datenbank für Evolution (Instanzen, Nachrichten, Kontakte) ----
+  postgres:
+    image: postgres:15-alpine
+    container_name: wa_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [wa_net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- Redis: Cache/Session-Store für Evolution ----
+  redis:
+    image: redis:7-alpine
+    container_name: wa_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks: [wa_net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- Evolution API v2 (Baileys) ----
+  evolution_api:
+    # v2 stabil gepinnt. Alternative: evoapicloud/evolution-api:latest
+    image: atendai/evolution-api:v2.1.1
+    container_name: evolution_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # --- Server / Auth ---
+      SERVER_URL: https://${EVO_HOSTNAME}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
+      DEL_INSTANCE: "false"
+      LANGUAGE: en
+      LOG_LEVEL: ERROR
+      LOG_COLOR: "true"
+
+      # --- WhatsApp-Client-Anzeige (erscheint unter "Verknüpfte Geräte") ---
+      CONFIG_SESSION_PHONE_CLIENT: Communicator
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      QRCODE_LIMIT: "30"
+      QRCODE_COLOR: "#45c198"
+
+      # --- PostgreSQL (Prisma) ---
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "true"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
+      DATABASE_SAVE_DATA_CHATS: "true"
+      DATABASE_SAVE_DATA_LABELS: "true"
+      DATABASE_SAVE_DATA_HISTORIC: "true"
+
+      # --- Redis-Cache ---
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_REDIS_SAVE_INSTANCES: "true"
+      CACHE_LOCAL_ENABLED: "false"
+
+      # --- Webhook: GLOBAL aus. Wir setzen den Webhook PRO INSTANZ per API
+      #     (siehe SETUP.md, AUFGABE 2) auf  http://<n8n>:5678/webhook/wa-incoming ---
+      WEBHOOK_GLOBAL_ENABLED: "false"
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks: [wa_net]
+    # KEIN ports:-Mapping nach außen – Zugriff ausschließlich über Caddy (HTTPS)
+    # und intern über http://evolution_api:8080 (z. B. aus n8n).
+    expose:
+      - "8080"
+
+  # ---- Caddy: Reverse Proxy + automatisches Let's-Encrypt-Zertifikat ----
+  caddy:
+    image: caddy:2-alpine
+    container_name: wa_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Werden in der Caddyfile als {$VAR} verwendet
+      N8N_HOSTNAME: ${N8N_HOSTNAME}
+      EVO_HOSTNAME: ${EVO_HOSTNAME}
+      N8N_CONTAINER: ${N8N_CONTAINER}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [wa_net]
+
+volumes:
+  postgres_data:
+  redis_data:
+  evolution_instances:
+  caddy_data:
+  caddy_config:
+
+networks:
+  wa_net:
+    name: wa_net
+    driver: bridge
