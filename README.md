@@ -53,7 +53,11 @@ Firebase-Projekt **`jupidu-36804`**, Firestore + Storage.
 
 **Collection `wa_chats`** (Doc-ID = Nummer, nur Ziffern, z. B. `41791234567`):
 ```js
-{ number, name, lastText, lastTs /*ms*/, unread /*Zahl*/, updatedAt /*ms*/ }
+{ number, name, lastText, lastTs /*ms*/, unread /*Zahl*/, updatedAt /*ms*/,
+  // Teil 1 (Quantus/KI) – optional:
+  quantusContactId?, quantusOrgId?,                       // Verknüpfung – Frontend schreibt
+  aiSummary?: { text, todos:[string], updatedAt /*ms*/ }  // n8n schreibt (action:summarize)
+}
 ```
 **Collection `wa_messages`** (Auto-ID):
 ```js
@@ -72,16 +76,50 @@ Firebase-Projekt **`jupidu-36804`**, Firestore + Storage.
 **Eingang (Evolution → n8n)**: `POST {intern}/webhook/wa-incoming`
 
 > **CORS-Hinweis für den n8n-Chat:** Da das Frontend (Netlify) per Browser auf den
-> n8n-Webhook postet, muss der `wa-send`-Webhook CORS erlauben
-> (`Access-Control-Allow-Origin: *`) und die `OPTIONS`-Preflight beantworten
-> (im n8n-Webhook-Node „Allowed Origins" = `*` setzen).
+> n8n-Webhook postet, müssen **alle** Webhooks (`wa-send`, `wa-ai`, `wa-quantus`)
+> CORS erlauben (`Access-Control-Allow-Origin: *`) und die `OPTIONS`-Preflight
+> beantworten (im n8n-Webhook-Node „Allowed Origins" = `*` setzen).
+
+### KI-Gateway (Frontend → n8n): `POST {n8nPublicUrl}/webhook/wa-ai`
+
+Ein Endpunkt, `action` im Body. **Kein KI-Schlüssel im Frontend** – die Logik liegt in n8n.
+```js
+// Body: { action, number?, msgId?, text?, targetLang?, style? }
+summarize        → schreibt wa_chats.aiSummary { text, todos:[string], updatedAt }; Antwort { ok }
+suggest_replies  → { ok, suggestions:[string] }
+draft_task       → { ok, title, due?, column? }
+translate        → { ok, text }     // Eingabe: msgId ODER text, plus targetLang   (Teil 2)
+polish           → { ok, text }     // Eingabe: text, optional style                (Teil 2)
+```
+
+### Quantus-Gateway (Frontend → n8n): `POST {n8nPublicUrl}/webhook/wa-quantus`
+
+Quantus-**Lesen und Task-Anlage laufen komplett über n8n** – das Frontend greift nie direkt
+auf Quantus-Collections zu; in `wa_chats` liegen nur die Link-IDs. `action` im Body:
+```js
+search       { q }                          → { ok, results:[{ id, kind:"person"|"org", name, subtitle? }] }
+get          { number, contactId?, orgId? } → { ok, contact?{ id, name, role?, orgName? },
+                                                     org?{ id, name, type? },
+                                                     tasks:[{ title, status, dueDate? }] }   // offene Aufgaben
+create_task  { title, description?, status, priority /*1–5*/, dueDate?,
+               sourceApp:"communicator", sourceNumber, sourceMsgId?,
+               quantusContactId?, quantusOrgId? }            → { ok, taskId? }
+```
+> **Quantus-Schema (geklärt):** Personen `entities.persons`, Organisationen
+> `entities.organizations`, Aufgaben in der Tasks-Collection mit Board-Spalten
+> `todo | doing | waiting | review | done` und Priorität `1–5`. n8n mappt
+> `status`/`priority` auf die Quantus-Felder und ergänzt `sourceApp/sourceNumber/sourceMsgId`.
 
 ## Firestore-Sicherheitsregeln
 
-Siehe `deploy/firestore.rules`: **Lesen frei**, das Frontend darf nur `unread`
-auf 0 setzen, sonst kein Schreibzugriff. n8n schreibt über das Admin SDK
-(Service-Account) und umgeht die Regeln. In der Firebase-Console unter
-*Firestore → Regeln* einspielen.
+Siehe `deploy/firestore.rules`: **Lesen frei**. Das Frontend darf auf `wa_chats`
+nur eine kleine **Feld-Allowlist** schreiben – `unread` (nur auf `0`) sowie die
+Quantus-Verknüpfung `quantusContactId`/`quantusOrgId` (Teil 1). Sonst kein
+Schreibzugriff; n8n schreibt über das Admin SDK (Service-Account) und umgeht die
+Regeln. **Tradeoff (Single-User, kein Login):** Ohne Auth schützt die Allowlist
+nicht vor einem böswilligen Client, verhindert aber zuverlässig, dass das Frontend
+n8n-Hoheitsfelder (`lastText`, Nachrichten-Status, `aiSummary` …) versehentlich
+überschreibt. In der Firebase-Console unter *Firestore → Regeln* einspielen.
 
 ## VPS-Stack aufsetzen
 

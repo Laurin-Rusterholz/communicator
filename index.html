@@ -202,12 +202,70 @@
   .lightbox.show{display:grid}
   .lightbox img{max-width:94vw;max-height:92vh;border-radius:10px;box-shadow:var(--shadow-lg)}
 
+  /* ───── Teil 1: Lade-Spinner ───── */
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ───── Teil 1: Blasen-Aktion „Zu Aufgabe" ───── */
+  .row{align-items:center}
+  .b-act{opacity:0;flex-shrink:0;width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--panel2);color:var(--muted);display:grid;place-items:center;font-size:15px;margin:0 6px;transition:var(--transition)}
+  .b-act:hover{color:var(--accent);border-color:var(--accent-soft);background:var(--accent-soft)}
+  .row:hover .b-act{opacity:.8}
+  .row.out .b-act{order:-1}
+
+  /* ───── Teil 1: Antwortvorschlag-Chips ───── */
+  .chips-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+  .chips-head button{margin-left:auto;border:0;background:none;color:var(--muted);font-size:15px;cursor:pointer}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+  .chip{padding:8px 13px;border-radius:18px;border:1px solid var(--accent-soft);background:var(--accent-soft);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;transition:var(--transition);text-align:left;max-width:100%}
+  .chip:hover{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+
+  /* ───── Teil 1: Info/Quantus-Drawer ───── */
+  .qpanel-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;z-index:108}
+  .qpanel-backdrop.show{display:block}
+  .qpanel{position:fixed;top:0;right:0;height:100vh;width:360px;max-width:92vw;background:var(--panel);border-left:1px solid var(--border);box-shadow:var(--shadow-lg);z-index:110;transform:translateX(100%);transition:transform .22s cubic-bezier(.25,.1,.25,1);display:flex;flex-direction:column}
+  .qpanel.show{transform:translateX(0)}
+  .qpanel-head{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
+  .qpanel-head .qt{font-weight:800;font-size:15px;flex:1;min-width:0}
+  .qpanel-body{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:16px}
+  .q-sec{border:1px solid var(--border);border-radius:var(--radius-sm);padding:13px 14px;background:var(--surface-base)}
+  .q-sec h4{font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+  .q-rec{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+  .q-rec .nm{font-weight:700;font-size:14.5px}
+  .q-rec .ln{font-size:12.5px;color:var(--muted)}
+  .q-task{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--border);font-size:13px}
+  .q-task .st{font-size:9.5px;font-weight:800;text-transform:uppercase;padding:2px 7px;border-radius:10px;background:var(--hover);color:var(--muted);flex-shrink:0}
+  .q-task .tt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .q-task .du{font-size:11px;color:var(--muted);flex-shrink:0}
+  .q-muted{font-size:12.5px;color:var(--muted);line-height:1.5}
+  .q-summary{white-space:pre-wrap;font-size:13.5px;line-height:1.55}
+  .q-todos{margin:9px 0 0;padding-left:18px;font-size:13px;line-height:1.6}
+  .lp-results{display:flex;flex-direction:column;gap:6px;margin-top:10px;max-height:260px;overflow-y:auto}
+  .lp-item{text-align:left;padding:9px 11px;border:1px solid var(--border);border-radius:9px;background:var(--panel2);cursor:pointer;transition:var(--transition)}
+  .lp-item:hover{background:var(--accent-soft);border-color:var(--accent-soft)}
+  .lp-item .nm{font-weight:700;font-size:13.5px}
+  .lp-item .sub{font-size:11.5px;color:var(--muted)}
+
+  /* ───── Teil 1: Buttons & Formularfelder ───── */
+  .btn.ghost{background:transparent}
+  .btn.sm{padding:6px 11px;font-size:12.5px;border-radius:9px}
+  .btn.danger{border-color:rgba(229,118,90,.45);color:var(--danger)}
+  .btn.full{width:100%;display:flex;justify-content:center}
+  .th-btn{border:1px solid var(--border);background:var(--panel2);border-radius:9px;width:34px;height:34px;display:grid;place-items:center;font-size:15px;flex-shrink:0;transition:var(--transition)}
+  .th-btn:hover{background:var(--hover);border-color:var(--border2)}
+  .th-spacer{flex:1}
+  .field select,.field textarea{width:100%;padding:10px 13px;background:var(--surface-base);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);outline:none;font:inherit}
+  .field select:focus,.field textarea:focus{border-color:var(--accent-soft);box-shadow:0 0 0 3px var(--accent-soft)}
+  .field textarea{resize:vertical;min-height:60px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
   /* ───── Responsive ───── */
   @media(max-width:820px){
     .sidebar{width:100%;position:absolute;inset:0;z-index:10}
     .sidebar.hide{display:none}
     .chat{position:absolute;inset:0;z-index:5}
     .back-btn{display:grid}
+    .b-act{opacity:.8}
   }
 </style>
 </head>
@@ -239,6 +297,10 @@ const CONFIG = {
   chatsColl:    "wa_chats",
   msgsColl:     "wa_messages",
   locale:       "de-CH",
+  // n8n-Endpunkte (kein KI-Key im Frontend!):
+  sendPath:     "/webhook/wa-send",      // Senden (bestehend)
+  aiPath:       "/webhook/wa-ai",        // KI-Gateway: action im Body
+  quantusPath:  "/webhook/wa-quantus",   // Quantus-Gateway: action im Body (Lesen + Task anlegen)
   n8nUrlStorage:"communicator_n8n_url",
   themeStorage: "communicator_theme"
 };
@@ -279,7 +341,12 @@ const state = {
   search:   "",
   pending:  {},        // { number: [ {tempId, type, text, ts, status, localUrl, fileName} ] }
   lastSyncOk: false,
-  lastSyncTs: 0
+  lastSyncTs: 0,
+  // ── Teil 1 (Quantus + KI) ──
+  panelOpen:  false,   // Info/Quantus-Drawer offen?
+  quantus:    {},      // Cache je number: { loading, error, contact, org, tasks, loadedAt }
+  summarizing:{},      // number -> Startzeit (ms) einer laufenden KI-Zusammenfassung
+  suggestions:null     // { number, loading, error, items:[string] } für Antwortvorschläge
 };
 
 let db = null, fileKind = null;
@@ -319,6 +386,7 @@ async function pollChats(){
     state.chats = snap.docs.map(d => ({ number: d.id, ...d.data() }));
     state.lastSyncOk = true; state.lastSyncTs = Date.now();
     renderContacts();
+    if (state.panelOpen) renderQuantusPanel();   // aiSummary/Verknüpfung live aktualisieren
   } catch(e){
     state.lastSyncOk = false;
     console.warn("pollChats:", e.message);
@@ -359,14 +427,17 @@ async function resetUnread(number){
 // ===========================================================================
 //  Senden  (POST an n8n-Webhook)
 // ===========================================================================
-async function postToN8n(payload){
+async function callN8n(path, payload){
   if (!n8nConfigured()) throw new Error("n8n-URL nicht gesetzt (⚙️ Einstellungen).");
-  const url = CONFIG.n8nPublicUrl.replace(/\/+$/,"") + "/webhook/wa-send";
+  const url = CONFIG.n8nPublicUrl.replace(/\/+$/,"") + path;
   const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
   let data = {}; try { data = await res.json(); } catch(e){}
   if (!res.ok || data.ok === false) throw new Error(data.error || ("HTTP " + res.status));
   return data;
 }
+function postToN8n(payload){ return callN8n(CONFIG.sendPath, payload); }       // Senden (bestehend)
+function callAi(action, extra){ return callN8n(CONFIG.aiPath, { action, ...extra }); }       // KI-Gateway
+function callQuantus(action, extra){ return callN8n(CONFIG.quantusPath, { action, ...extra }); } // Quantus-Gateway
 
 async function sendText(){
   const ta = $("#composerInput");
@@ -508,6 +579,8 @@ function renderShell(){
     </div>`;
   root.appendChild(app);
   root.appendChild(buildSettingsModal());
+  root.appendChild(buildQuantusPanel());   // Teil 1: Info/Quantus-Drawer
+  root.appendChild(buildTaskModal());       // Teil 1B: Nachricht → Aufgabe
 
   // Suche (input-Event, kein data-action)
   $("#search").addEventListener("input", (e) => {
@@ -603,6 +676,8 @@ function renderChat(){
         <div class="th-name">${esc(displayName(c||{number:state.selected}))}</div>
         <div class="th-sub">+${esc(state.selected)}</div>
       </div>
+      <div class="th-spacer"></div>
+      <button class="th-btn" data-action="toggle-panel" title="Quantus & KI">🔗</button>
     </div>`);
   const body = document.createElement("div");
   body.className = "thread-body"; body.id = "threadBody";
@@ -649,7 +724,8 @@ function bubble(m, q){
         <span class="di">📄</span><span><span class="dn">${esc(m.fileName||"Dokument")}</span><span class="dm">PDF öffnen</span></span></a>`;
   const text = m.text ? `<div>${highlight(m.text, q)}</div>` : "";
   const ticks = out ? `<span class="tick ${m.status==='read'?'read':''}">${statusTickGlyph(m.status)}</span>` : "";
-  row.innerHTML = `<div class="bubble ${hit?'hit':''}">${media}${text}<div class="meta"><span>${fmtClock(m.ts)}</span>${ticks}</div></div>`;
+  row.innerHTML = `<div class="bubble ${hit?'hit':''}">${media}${text}<div class="meta"><span>${fmtClock(m.ts)}</span>${ticks}</div></div>`
+    + `<button class="b-act" data-action="msg-to-task" data-msgid="${esc(m.id||'')}" title="Zu Aufgabe (Quantus)">📋</button>`;
   return row;
 }
 function pendingBubble(p){
@@ -677,6 +753,14 @@ function renderComposer(){
   const c = $("#composer"); if (!c) return;
   const prevText = $("#composerInput")?.value || "";   // getippten Text über das Re-Render retten
   const recording = mediaRec && mediaRec.state === "recording";
+  // Antwortvorschlag-Chips (D) — nur für den offenen Chat
+  let chipsHtml = "";
+  const sug = state.suggestions;
+  if (sug && sug.number === state.selected){
+    if (sug.loading) chipsHtml = `<div class="chips-head"><span class="spin"></span>&nbsp;Antwortvorschläge…</div>`;
+    else if (sug.error) chipsHtml = `<div class="chips-head">Vorschläge fehlgeschlagen<button data-action="suggest-clear" title="Schließen">✕</button></div><div class="q-muted">${esc(sug.error)}</div>`;
+    else if (sug.items && sug.items.length) chipsHtml = `<div class="chips-head">Antwortvorschläge — tippen füllt das Feld<button data-action="suggest-clear" title="Schließen">✕</button></div><div class="chips">${sug.items.map((s,i)=>`<button class="chip" data-action="use-suggestion" data-idx="${i}">${esc(s)}</button>`).join("")}</div>`;
+  }
   let top = "";
   if (recording){
     top = `<div class="recbar"><span class="rdot"></span><span class="rt" id="recTime">0:00</span>
@@ -691,14 +775,15 @@ function renderComposer(){
       <span class="ap-n">${esc(attachment.fileName)}<small>${esc(attachment.type)} · wird mit gesendet</small></span>
       <button class="c-btn" data-action="attach-clear" title="Entfernen">✕</button></div>`;
   }
-  c.innerHTML = `${top}
+  c.innerHTML = `${top}${chipsHtml}
     <div class="composer-row">
       <button class="c-btn" data-action="attach" title="Bild / PDF anhängen" ${recording?"disabled":""}>📎</button>
       <textarea id="composerInput" rows="1" placeholder="Nachricht schreiben…" ${recording?"disabled":""}></textarea>
+      <button class="c-btn" data-action="suggest-replies" title="Antwort vorschlagen (KI)" ${recording?"disabled":""}>✨</button>
       <button class="c-btn rec" data-action="rec-toggle" title="Sprachnachricht">🎤</button>
       <button class="c-btn send" data-action="send" title="Senden (Enter)">➤</button>
     </div>
-    <div class="hint">Enter sendet · Shift+Enter = neue Zeile · Bilder, PDF & Sprachnachrichten möglich</div>`;
+    <div class="hint">Enter sendet · Shift+Enter = neue Zeile · ✨ Antwortvorschlag (über n8n, kein Auto-Versand)</div>`;
   const ta = $("#composerInput");
   if (ta && !recording){
     ta.value = prevText; autoGrow(ta);
@@ -809,6 +894,263 @@ function dayLabel(ts){
 function elFromHtml(html){ const t=document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; }
 
 // ===========================================================================
+//  Teil 1 — Quantus-Verknüpfung (A), KI-Zusammenfassung (C), Antwortvorschläge (D)
+// ===========================================================================
+function chatByNumber(num){ return state.chats.find(x => x.number === num) || null; }
+function fmtDateTime(ms){ if (!ms) return ""; return new Date(ms).toLocaleString(CONFIG.locale, {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}); }
+
+// ---- Info/Quantus-Drawer (rechts) ----------------------------------------
+function buildQuantusPanel(){
+  return elFromHtml(`
+    <div>
+      <div class="qpanel-backdrop" id="qpanelBackdrop" data-action="close-panel"></div>
+      <aside class="qpanel" id="qpanel" aria-label="Quantus und KI">
+        <div class="qpanel-head">
+          <span class="qt" id="qpanelTitle">Quantus &amp; KI</span>
+          <button class="th-btn" data-action="close-panel" title="Schließen">✕</button>
+        </div>
+        <div class="qpanel-body" id="qpanelBody"></div>
+      </aside>
+    </div>`);
+}
+function openPanel(){ if (!state.selected) return; state.panelOpen = true; $("#qpanel")?.classList.add("show"); $("#qpanelBackdrop")?.classList.add("show"); ensureQuantus(state.selected); renderQuantusPanel(); }
+function closePanel(){ state.panelOpen = false; $("#qpanel")?.classList.remove("show"); $("#qpanelBackdrop")?.classList.remove("show"); }
+function togglePanel(){ state.panelOpen ? closePanel() : openPanel(); }
+
+function renderQuantusPanel(){
+  const body = $("#qpanelBody"); if (!body || !state.panelOpen) return;
+  const num = state.selected, c = chatByNumber(num);
+  const title = $("#qpanelTitle");
+  if (!num || !c){ body.innerHTML = `<div class="q-muted">Kein Chat ausgewählt.</div>`; return; }
+  if (title) title.textContent = displayName(c);
+  body.innerHTML = quantusSectionHtml(c) + summarySectionHtml(c);
+}
+function quantusSectionHtml(c){
+  const linked = c.quantusContactId || c.quantusOrgId;
+  if (!linked){
+    return `<div class="q-sec">
+      <h4>🔗 Quantus-Verknüpfung</h4>
+      <div class="q-muted">Noch nicht verknüpft. Verbinde diesen Chat mit einer Quantus-Person oder -Organisation, um Datensatz und offene Aufgaben zu sehen.</div>
+      <div style="margin-top:11px"><button class="btn primary sm full" data-action="link-open">Verknüpfen…</button></div>
+      <div id="lpWrap"></div>
+    </div>`;
+  }
+  const q = state.quantus[c.number] || {};
+  let inner = "";
+  if (q.loading) inner = `<div class="q-muted"><span class="spin"></span>&nbsp;Lade Quantus-Daten…</div>`;
+  else if (q.error) inner = `<div class="q-muted">⚠ ${esc(q.error)}</div><button class="btn ghost sm" data-action="quantus-refresh" style="margin-top:8px">Erneut versuchen</button>`;
+  else {
+    if (q.contact) inner += `<div class="q-rec"><span class="nm">👤 ${esc(q.contact.name||"(ohne Name)")}</span>${q.contact.role?`<span class="ln">${esc(q.contact.role)}</span>`:""}${q.contact.orgName?`<span class="ln">🏛 ${esc(q.contact.orgName)}</span>`:""}</div>`;
+    if (q.org) inner += `<div class="q-rec"><span class="nm">🏛 ${esc(q.org.name||"(ohne Name)")}</span>${q.org.type?`<span class="ln">${esc(q.org.type)}</span>`:""}</div>`;
+    if (!q.contact && !q.org) inner += `<div class="q-muted">Verknüpft, aber Datensatz nicht gefunden.</div>`;
+    const tasks = Array.isArray(q.tasks) ? q.tasks : [];
+    inner += `<div class="q-muted" style="margin-top:8px;font-weight:700;color:var(--text)">Offene Aufgaben (${tasks.length})</div>`;
+    if (!tasks.length) inner += `<div class="q-muted">Keine offenen Aufgaben.</div>`;
+    else inner += tasks.map(t => `<div class="q-task"><span class="st">${esc(t.status||"")}</span><span class="tt">${esc(t.title||"(ohne Titel)")}</span>${t.dueDate?`<span class="du">${esc(t.dueDate)}</span>`:""}</div>`).join("");
+  }
+  return `<div class="q-sec">
+    <h4>🔗 Quantus-Verknüpfung<button class="btn ghost sm" data-action="quantus-unlink" title="Verknüpfung lösen" style="margin-left:auto">Lösen</button></h4>
+    ${inner}
+    <div id="lpWrap"></div>
+  </div>`;
+}
+function summarySectionHtml(c){
+  const start = state.summarizing[c.number];
+  const s = c.aiSummary;
+  const haveFresh = s && s.text && (!start || (s.updatedAt||0) >= start);
+  if (start && haveFresh) delete state.summarizing[c.number];
+  let inner;
+  if (start && !haveFresh){
+    inner = (Date.now() - start > 90000)
+      ? `<div class="q-muted">⚠ Zeitüberschreitung — es kam noch keine Zusammenfassung von n8n.</div>`
+      : `<div class="q-muted"><span class="spin"></span>&nbsp;KI fasst zusammen…</div>`;
+  } else if (s && s.text){
+    inner = `<div class="q-summary">${esc(s.text)}</div>`;
+    if (Array.isArray(s.todos) && s.todos.length) inner += `<ul class="q-todos">${s.todos.map(t => `<li>${esc(t)}</li>`).join("")}</ul>`;
+    if (s.updatedAt) inner += `<div class="q-muted" style="margin-top:8px">Stand: ${esc(fmtDateTime(s.updatedAt))}</div>`;
+  } else {
+    inner = `<div class="q-muted">Noch keine Zusammenfassung für diesen Chat.</div>`;
+  }
+  return `<div class="q-sec">
+    <h4>🧠 KI-Zusammenfassung</h4>
+    ${inner}
+    <button class="btn primary sm full" data-action="summarize" style="margin-top:11px">${(s&&s.text)?"Neu zusammenfassen":"Zusammenfassen"}</button>
+  </div>`;
+}
+
+// ---- Quantus-Daten laden (über n8n-Gateway) ------------------------------
+async function ensureQuantus(number, force){
+  const c = chatByNumber(number);
+  const hasLink = c && (c.quantusContactId || c.quantusOrgId);
+  if (!hasLink){ delete state.quantus[number]; return; }
+  const cached = state.quantus[number];
+  if (!force && cached && !cached.error && !cached.loading && (Date.now() - (cached.loadedAt||0) < 15000)) return;
+  state.quantus[number] = { loading:true };
+  renderQuantusPanel();
+  try {
+    const r = await callQuantus("get", { number, contactId: c.quantusContactId || undefined, orgId: c.quantusOrgId || undefined });
+    state.quantus[number] = { contact:r.contact||null, org:r.org||null, tasks:Array.isArray(r.tasks)?r.tasks:[], loadedAt:Date.now() };
+  } catch(e){ state.quantus[number] = { error:e.message, loadedAt:Date.now() }; }
+  if (state.selected === number) renderQuantusPanel();
+}
+
+// ---- Verknüpfen (Link-Picker) — schreibt quantusContactId/OrgId in wa_chats ----
+function openLinkPicker(){
+  const wrap = $("#lpWrap"); if (!wrap) return;
+  wrap.innerHTML = `<div style="margin-top:12px">
+    <div class="field"><input id="lpInput" type="search" placeholder="Quantus durchsuchen (Person/Org)…" autocomplete="off" /></div>
+    <div class="q-muted" id="lpHint">Mind. 2 Zeichen eingeben.</div>
+    <div class="lp-results" id="lpResults"></div>
+  </div>`;
+  const inp = $("#lpInput"); let timer = null;
+  inp.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => runLinkSearch(inp.value.trim()), 300); });
+  inp.focus();
+}
+async function runLinkSearch(q){
+  const res = $("#lpResults"), hint = $("#lpHint"); if (!res) return;
+  if (q.length < 2){ res.innerHTML = ""; if (hint) hint.textContent = "Mind. 2 Zeichen eingeben."; return; }
+  if (hint) hint.innerHTML = `<span class="spin"></span>&nbsp;Suche…`;
+  try {
+    const r = await callQuantus("search", { q });
+    const items = Array.isArray(r.results) ? r.results : [];
+    if (hint) hint.textContent = items.length ? "" : "Kein Treffer.";
+    res.innerHTML = items.map(it => `<button class="lp-item" data-action="link-pick" data-id="${esc(it.id)}" data-kind="${esc(it.kind||'person')}">
+        <span class="nm">${it.kind==='org'?'🏛 ':'👤 '}${esc(it.name||'(ohne Name)')}</span>${it.subtitle?`<span class="sub">${esc(it.subtitle)}</span>`:""}</button>`).join("");
+  } catch(e){ if (hint) hint.textContent = "Fehler: " + e.message; }
+}
+async function pickLink(id, kind){
+  const num = state.selected; if (!num || !id) return;
+  const field = (kind === "org") ? "quantusOrgId" : "quantusContactId";
+  try {
+    await db.collection(CONFIG.chatsColl).doc(num).update({ [field]: id });
+    const c = chatByNumber(num); if (c) c[field] = id;          // optimistisch
+    toast("ok", "Verknüpft", (kind==="org"?"Organisation":"Person") + " mit diesem Chat verknüpft.");
+    ensureQuantus(num, true); renderQuantusPanel();
+  } catch(e){ toast("danger", "Verknüpfen fehlgeschlagen", e.message, 6000); }
+}
+async function unlinkQuantus(){
+  const num = state.selected; if (!num) return;
+  try {
+    await db.collection(CONFIG.chatsColl).doc(num).update({ quantusContactId: null, quantusOrgId: null });
+    const c = chatByNumber(num); if (c){ c.quantusContactId = null; c.quantusOrgId = null; }
+    delete state.quantus[num];
+    toast("ok", "Verknüpfung gelöst", "");
+    renderQuantusPanel();
+  } catch(e){ toast("danger", "Lösen fehlgeschlagen", e.message, 6000); }
+}
+
+// ---- KI-Zusammenfassung (C) — n8n schreibt wa_chats.aiSummary, Frontend pollt ----
+async function summarize(){
+  const num = state.selected; if (!num) return;
+  state.summarizing[num] = Date.now();
+  renderQuantusPanel();
+  try { await callAi("summarize", { number: num }); }
+  catch(e){ delete state.summarizing[num]; toast("danger", "Zusammenfassen fehlgeschlagen", e.message, 6000); renderQuantusPanel(); }
+}
+
+// ---- Antwortvorschläge (D) — Chips füllen das Eingabefeld, KEIN Auto-Versand ----
+async function suggestReplies(){
+  const num = state.selected; if (!num) return;
+  state.suggestions = { number: num, loading:true };
+  renderComposer();
+  try {
+    const r = await callAi("suggest_replies", { number: num });
+    state.suggestions = { number: num, items: Array.isArray(r.suggestions) ? r.suggestions : [] };
+  } catch(e){ state.suggestions = { number: num, error: e.message }; }
+  if (state.selected === num) renderComposer();
+}
+function useSuggestion(idx){
+  const s = state.suggestions; if (!s || !s.items) return;
+  const txt = s.items[idx]; if (txt == null) return;
+  const ta = $("#composerInput"); if (ta){ ta.value = txt; autoGrow(ta); ta.focus(); }   // füllt nur, sendet nicht
+}
+function clearSuggestions(){ state.suggestions = null; renderComposer(); }
+
+// ===========================================================================
+//  Teil 1B — Nachricht → Quantus-Aufgabe (über n8n-Gateway)
+// ===========================================================================
+let taskCtx = null;
+function buildTaskModal(){
+  return elFromHtml(`
+    <div class="modal-bg" id="taskModal" data-action="close-task">
+      <div class="modal" data-stop>
+        <h3>📋 Zu Aufgabe (Quantus)</h3>
+        <div class="modal-body">
+          <div class="field"><label>Titel</label><input id="tkTitle" type="text" placeholder="Aufgabentitel" /></div>
+          <div class="field"><label>Beschreibung</label><textarea id="tkDesc" placeholder="Optionaler Kontext / Notiz"></textarea></div>
+          <div class="grid2">
+            <div class="field"><label>Board-Spalte</label><select id="tkStatus">
+              <option value="todo">To-do</option><option value="doing">In Arbeit</option><option value="waiting">Wartet</option><option value="review">Review</option><option value="done">Erledigt</option>
+            </select></div>
+            <div class="field"><label>Priorität</label><select id="tkPrio">
+              <option value="1">1 · 🔴 kritisch</option><option value="2">2 · 🟠 hoch</option><option value="3" selected>3 · 🟡 mittel</option><option value="4">4 · 🟢 normal</option><option value="5">5 · ⚪ niedrig</option>
+            </select></div>
+          </div>
+          <div class="field"><label>Fällig am (optional)</label><input id="tkDue" type="date" /></div>
+          <div class="q-muted" id="tkMeta"></div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost sm" data-action="task-ai" id="tkAiBtn">✨ KI-Vorschlag</button>
+          <span class="th-spacer"></span>
+          <button class="btn" data-action="close-task">Abbrechen</button>
+          <button class="btn primary" id="tkSubmit" data-action="task-submit">Aufgabe anlegen</button>
+        </div>
+      </div>
+    </div>`);
+}
+function openTaskModal(msgId){
+  const num = state.selected; if (!num){ toast("warn","Kein Chat","Öffne zuerst einen Chat."); return; }
+  const m = state.messages.find(x => x.id === msgId) || null;
+  taskCtx = { number:num, msgId: msgId || null };
+  const guess = ((m && m.text) ? m.text : "").trim().slice(0,120) || ("Nachricht von " + displayName(chatByNumber(num)||{number:num}));
+  $("#tkTitle").value = guess;
+  $("#tkDesc").value  = (m && m.text) ? m.text : "";
+  $("#tkStatus").value = "todo"; $("#tkPrio").value = "3"; $("#tkDue").value = "";
+  const c = chatByNumber(num);
+  $("#tkMeta").textContent = "Quelle: WhatsApp +" + num + ((c && (c.quantusContactId||c.quantusOrgId)) ? " · Quantus-Verknüpfung wird mitgegeben" : "");
+  $("#taskModal").classList.add("show");
+  setTimeout(() => $("#tkTitle").focus(), 40);
+}
+function closeTaskModal(){ $("#taskModal").classList.remove("show"); taskCtx = null; }
+async function taskAiSuggest(){
+  if (!taskCtx) return;
+  const btn = $("#tkAiBtn"); const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = `<span class="spin"></span>&nbsp;…`;
+  try {
+    const r = await callAi("draft_task", { number: taskCtx.number, msgId: taskCtx.msgId || undefined, text: ($("#tkDesc").value||"").trim() || undefined });
+    if (r.title) $("#tkTitle").value = r.title;
+    if (r.column && ["todo","doing","waiting","review","done"].includes(r.column)) $("#tkStatus").value = r.column;
+    if (r.due) $("#tkDue").value = r.due;
+    toast("ok", "KI-Vorschlag", "Felder vorbefüllt.");
+  } catch(e){ toast("danger", "KI-Vorschlag fehlgeschlagen", e.message, 6000); }
+  finally { btn.disabled = false; btn.innerHTML = old; }
+}
+async function submitTask(){
+  if (!taskCtx) return;
+  const title = ($("#tkTitle").value||"").trim();
+  if (!title){ toast("warn", "Titel fehlt", "Bitte einen Titel eingeben."); return; }
+  const c = chatByNumber(taskCtx.number) || {};
+  const payload = {
+    title,
+    description: ($("#tkDesc").value||"").trim() || undefined,
+    status: $("#tkStatus").value,
+    priority: parseInt($("#tkPrio").value, 10) || 3,
+    dueDate: ($("#tkDue").value || "") || undefined,
+    sourceApp: "communicator",
+    sourceNumber: taskCtx.number,
+    sourceMsgId: taskCtx.msgId || undefined,
+    quantusContactId: c.quantusContactId || undefined,
+    quantusOrgId: c.quantusOrgId || undefined
+  };
+  const btn = $("#tkSubmit"); btn.disabled = true; const old = btn.textContent; btn.textContent = "Lege an…";
+  try {
+    await callQuantus("create_task", payload);
+    toast("ok", "Aufgabe angelegt", "An Quantus übergeben (Spalte: " + payload.status + ").");
+    closeTaskModal();
+    if (state.panelOpen) ensureQuantus(taskCtx?.number, true);
+  } catch(e){ toast("danger", "Anlegen fehlgeschlagen", e.message, 6000); btn.disabled = false; btn.textContent = old; }
+}
+
+// ===========================================================================
 //  Event-Delegation  (data-action)
 // ===========================================================================
 document.addEventListener("click", (e) => {
@@ -821,12 +1163,14 @@ document.addEventListener("click", (e) => {
       state.selected = num; state.messages = [];
       const c = state.chats.find(x => x.number === num);
       if (c && c.unread > 0){ c.unread = 0; resetUnread(num); }   // unread auf 0
+      state.suggestions = null;            // Vorschläge des alten Chats verwerfen
       renderContacts(); renderChat();
       fetchThread();                       // sofort laden (Poll-Schleife läuft separat)
+      if (state.panelOpen){ ensureQuantus(num); renderQuantusPanel(); }
       $("#sidebar")?.classList.add("hide");
       break;
     }
-    case "back": $("#sidebar")?.classList.remove("hide"); state.selected = null; renderChat(); renderContacts(); break;
+    case "back": $("#sidebar")?.classList.remove("hide"); state.selected = null; state.suggestions = null; closePanel(); renderChat(); renderContacts(); break;
     case "send": sendText(); break;
     case "attach": fileKind = null; $("#fileInput").click(); break;
     case "attach-clear": attachment = null; renderComposer(); break;
@@ -843,6 +1187,21 @@ document.addEventListener("click", (e) => {
     case "save-settings": saveSettings(); break;
     case "enlarge": { $("#lightboxImg").src = el.dataset.url; $("#lightbox").classList.add("show"); break; }
     case "close-lightbox": $("#lightbox").classList.remove("show"); break;
+    // ── Teil 1: Quantus & KI ──
+    case "toggle-panel": togglePanel(); break;
+    case "close-panel": if (e.target === el) closePanel(); break;
+    case "link-open": openLinkPicker(); break;
+    case "link-pick": pickLink(el.dataset.id, el.dataset.kind); break;
+    case "quantus-unlink": unlinkQuantus(); break;
+    case "quantus-refresh": ensureQuantus(state.selected, true); break;
+    case "summarize": summarize(); break;
+    case "suggest-replies": suggestReplies(); break;
+    case "suggest-clear": clearSuggestions(); break;
+    case "use-suggestion": useSuggestion(parseInt(el.dataset.idx, 10)); break;
+    case "msg-to-task": openTaskModal(el.dataset.msgid); break;
+    case "close-task": if (e.target === el) closeTaskModal(); break;
+    case "task-ai": taskAiSuggest(); break;
+    case "task-submit": submitTask(); break;
   }
 });
 

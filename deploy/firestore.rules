@@ -14,11 +14,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Chats/Kontakte: lesen frei; Schreiben nur "unread = 0" -------------
+    // --- Chats/Kontakte: lesen frei; Schreiben nur erlaubte Felder ----------
+    //  Single-User, kein Login: Lesen ist ohnehin offen. Beim Schreiben
+    //  begrenzen wir die Felder per allowlist, damit das Frontend NICHT
+    //  versehentlich/böswillig n8n-Felder (lastText, status-Häkchen der
+    //  Nachrichten, aiSummary …) überschreibt. unread bleibt auf 0 beschränkt.
+    //  Teil 1: zusätzlich die Quantus-Verknüpfung (quantusContactId/OrgId).
+    //  (Teil 2 erweitert die Liste um labels/pinned/manualUnread/status/
+    //   followUpAt/notes.)
     match /wa_chats/{number} {
       allow read: if true;
-      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unread'])
-                    && request.resource.data.unread == 0;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['unread', 'quantusContactId', 'quantusOrgId'])
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['unread'])
+                          || request.resource.data.unread == 0);
       allow create, delete: if false;
     }
 
